@@ -3,9 +3,9 @@
 #include "Vulkan/pipeline.hpp"
 #include "Vulkan/descriptor_set.hpp"
 
-extern std::unique_ptr<VulkanImage> create_image(const RenderScope& Scope, void* pixels, int count, int w, int h, int c, const VkFormat& format, const VkImageCreateFlags& flags);
+extern std::shared_ptr<VulkanImage> create_image(const RenderScope& Scope, void* pixels, int count, int w, int h, int c, const VkFormat& format, const VkImageCreateFlags& flags);
 
-std::unique_ptr<VulkanImage> generate(const char* shader, const RenderScope& Scope, VkFormat format, VkExtent3D imageSize, std::vector<std::any> constants, bool cube = false)
+std::shared_ptr<VulkanImage> generate(const char* shader, const RenderScope& Scope, VkFormat format, VkExtent3D imageSize, std::vector<std::any> constants, bool cube = false)
 {
 	std::vector<uint32_t> queueFamilies = FindDeviceQueues(Scope.GetPhysicalDevice(), {VK_QUEUE_GRAPHICS_BIT, VK_QUEUE_TRANSFER_BIT});
 	std::sort(queueFamilies.begin(), queueFamilies.end());
@@ -31,8 +31,8 @@ std::unique_ptr<VulkanImage> generate(const char* shader, const RenderScope& Sco
 	VmaAllocationCreateInfo noiseAllocCreateInfo{};
 	noiseAllocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 
-	std::unique_ptr<VulkanImage> noise = std::make_unique<VulkanImage>(Scope, noiseInfo, noiseAllocCreateInfo);
-	std::unique_ptr<VulkanImageView> noise_view = std::make_unique<VulkanImageView>(Scope, *noise);
+	auto noise = std::make_shared<VulkanImage>(Scope, noiseInfo, noiseAllocCreateInfo);
+	auto noise_view = std::make_shared<VulkanImageView>(Scope, *noise);
 
 	ComputePipelineDescriptor noise_pipeline{};
 	std::unique_ptr<DescriptorSet> noise_set = DescriptorSetDescriptor().AddStorageImage(0, VK_SHADER_STAGE_COMPUTE_BIT, noise_view->GetImageView())
@@ -64,7 +64,7 @@ std::unique_ptr<VulkanImage> generate(const char* shader, const RenderScope& Sco
 	return noise;
 }
 
-std::unique_ptr<VulkanImage> GRNoise::GenerateSolidColor(const RenderScope& Scope, VkExtent2D imageSize, VkFormat Format, std::byte r, std::byte g, std::byte b, std::byte a)
+std::shared_ptr<VulkanImage> GRNoise::GenerateSolidColor(const RenderScope& Scope, VkExtent2D imageSize, VkFormat Format, std::byte r, std::byte g, std::byte b, std::byte a)
 {
 	std::byte* pixels = new std::byte[imageSize.width * imageSize.height * 4];
 
@@ -78,53 +78,52 @@ std::unique_ptr<VulkanImage> GRNoise::GenerateSolidColor(const RenderScope& Scop
 		pixels[i + 3] = a;
 	}
 
-	std::unique_ptr<VulkanImage> target = create_image(Scope, pixels, 1, imageSize.width, imageSize.height, 4, Format, 0);
+	auto target = create_image(Scope, pixels, 1, imageSize.width, imageSize.height, 4, Format, 0);
 	
 	delete[] pixels;
 
 	return target;
 }
 
-std::unique_ptr<VulkanImage> GRNoise::GeneratePerlin(const RenderScope& Scope, VkExtent3D imageSize, uint32_t frequency, uint32_t octaves)
+std::shared_ptr<VulkanImage> GRNoise::GeneratePerlin(const RenderScope& Scope, VkExtent3D imageSize, uint32_t frequency, uint32_t octaves)
 {
 	uint32_t seed = 0;
 	seed = (uint32_t)&seed;
 	return generate("perlin_comp", Scope, VK_FORMAT_R8_UNORM, imageSize, { frequency, octaves, seed });
 }
 
-std::unique_ptr<VulkanImage> GRNoise::GenerateWorley(const RenderScope& Scope, VkExtent3D imageSize, uint32_t frequency, uint32_t octaves)
+std::shared_ptr<VulkanImage> GRNoise::GenerateWorley(const RenderScope& Scope, VkExtent3D imageSize, uint32_t frequency, uint32_t octaves)
 {
 	uint32_t seed = 0;
 	seed = (uint32_t)&seed;
 	return generate("worley_comp", Scope, VK_FORMAT_R8_UNORM, imageSize, { frequency, octaves, seed });
 }
 
-std::unique_ptr<VulkanImage> GRNoise::GenerateWorleyPerlin(const RenderScope& Scope, VkExtent3D imageSize, uint32_t frequency, uint32_t worley_octaves, uint32_t perlin_octaves)
+std::shared_ptr<VulkanImage> GRNoise::GenerateWorleyPerlin(const RenderScope& Scope, VkExtent3D imageSize, uint32_t frequency, uint32_t worley_octaves, uint32_t perlin_octaves)
 {
 	return generate("worley_perlin_comp", Scope, VK_FORMAT_R32G32B32A32_SFLOAT, imageSize, { frequency, worley_octaves, perlin_octaves });
 }
 
-std::unique_ptr<VulkanImage> GRNoise::GenerateCloudShapeNoise(const RenderScope& Scope, VkExtent3D imageSize, uint32_t worley_frequency, uint32_t perlin_frequency)
+std::shared_ptr<VulkanImage> GRNoise::GenerateCloudShapeNoise(const RenderScope& Scope, VkExtent3D imageSize, uint32_t worley_frequency, uint32_t perlin_frequency)
 {
 	uint32_t seed = 0;
 	seed = (uint32_t)&seed;
 	return generate("cloud_shape_comp", Scope, VK_FORMAT_R32_SFLOAT, imageSize, { worley_frequency, perlin_frequency, seed });
 }
 
-std::unique_ptr<VulkanImage> GRNoise::GenerateCloudDetailNoise(const RenderScope& Scope, VkExtent3D imageSize, uint32_t frequency, uint32_t octaves)
+std::shared_ptr<VulkanImage> GRNoise::GenerateCloudDetailNoise(const RenderScope& Scope, VkExtent3D imageSize, uint32_t frequency, uint32_t octaves)
 {
 	uint32_t seed = 0;
 	seed = (uint32_t)&seed;
 	return generate("cloud_detail_comp", Scope, VK_FORMAT_B10G11R11_UFLOAT_PACK32, imageSize, { frequency, octaves, seed });
 }
 
-std::unique_ptr<VulkanImage> GRNoise::GenerateWeatherCube(const RenderScope& Scope, VkExtent3D imageSize, uint32_t frequency, uint32_t worley_octaves, uint32_t perlin_octaves)
+std::shared_ptr<VulkanImage> GRNoise::GenerateWeatherCube(const RenderScope& Scope, VkExtent3D imageSize, uint32_t frequency, uint32_t worley_octaves, uint32_t perlin_octaves)
 {
-	imageSize.depth = 1;
 	return generate("weather_cubemap_comp", Scope, VK_FORMAT_R32G32B32A32_SFLOAT, imageSize, { frequency, worley_octaves, perlin_octaves }, true);
 }
 
-std::unique_ptr<VulkanImage> GRNoise::GenerateCheckerBoard(const RenderScope& Scope, VkExtent2D imageSize, uint32_t frequency)
+std::shared_ptr<VulkanImage> GRNoise::GenerateCheckerBoard(const RenderScope& Scope, VkExtent2D imageSize, uint32_t frequency)
 {
 	return generate("checkerboard", Scope, VK_FORMAT_R8_UNORM, { imageSize.width, imageSize.height, 1u }, { frequency });
 }

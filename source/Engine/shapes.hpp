@@ -21,7 +21,7 @@ namespace GR
 		{
 		protected:
 			friend class VulkanBase;
-			virtual std::unique_ptr<VulkanMesh> Generate(const RenderScope& Scope, GeometryDescriptor* outGeometry = nullptr) const = 0;
+			virtual std::shared_ptr<VulkanMesh> Generate(const RenderScope& Scope, GeometryDescriptor* outGeometry = nullptr) const = 0;
 
 		public:
 			virtual glm::vec3 GetDimensions() const = 0;
@@ -31,7 +31,7 @@ namespace GR
 		{
 		protected:
 			friend class VulkanBase;
-			GRAPI virtual std::unique_ptr<VulkanMesh> Generate(const RenderScope& Scope, GeometryDescriptor* outGeometry = nullptr) const override;
+			GRAPI virtual std::shared_ptr<VulkanMesh> Generate(const RenderScope& Scope, GeometryDescriptor* outGeometry = nullptr) const override;
 
 		public:
 			glm::vec3 GetDimensions() const override
@@ -48,7 +48,7 @@ namespace GR
 		{
 		protected:
 			friend class VulkanBase;
-			GRAPI virtual std::unique_ptr<VulkanMesh> Generate(const RenderScope& Scope, GeometryDescriptor* outGeometry = nullptr) const override;
+			GRAPI virtual std::shared_ptr<VulkanMesh> Generate(const RenderScope& Scope, GeometryDescriptor* outGeometry = nullptr) const override;
 			
 		public:
 			glm::vec3 GetDimensions() const override
@@ -65,7 +65,7 @@ namespace GR
 		{
 		protected:
 			friend class VulkanBase;
-			GRAPI virtual std::unique_ptr<VulkanMesh> Generate(const RenderScope& Scope, GeometryDescriptor* outGeometry = nullptr) const override;
+			GRAPI virtual std::shared_ptr<VulkanMesh> Generate(const RenderScope& Scope, GeometryDescriptor* outGeometry = nullptr) const override;
 
 		public:
 			glm::vec3 GetDimensions() const override
@@ -83,7 +83,7 @@ namespace GR
 		{
 		protected:
 			friend class VulkanBase;
-			GRAPI virtual std::unique_ptr<VulkanMesh> Generate(const RenderScope& Scope, GeometryDescriptor* outGeometry = nullptr) const override;
+			GRAPI virtual std::shared_ptr<VulkanMesh> Generate(const RenderScope& Scope, GeometryDescriptor* outGeometry = nullptr) const override;
 
 		public:
 			glm::vec3 GetDimensions() const override
@@ -99,7 +99,7 @@ namespace GR
 		{
 		protected:
 			friend class VulkanBase;
-			GRAPI virtual std::unique_ptr<VulkanMesh> Generate(const RenderScope& Scope, GeometryDescriptor* outGeometry = nullptr) const override;
+			GRAPI virtual std::shared_ptr<VulkanMesh> Generate(const RenderScope& Scope, GeometryDescriptor* outGeometry = nullptr) const override;
 
 		public:
 			glm::vec3 GetDimensions() const override

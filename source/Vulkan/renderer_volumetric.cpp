@@ -1,21 +1,13 @@
 #include "pch.hpp"
 #include "renderer.hpp"
+#include "Factories/VkBufferFactory.h"
 
 #define WRAPL(i) (i == 0 ? m_ResourceCount : i) - 1
 #define WRAPR(i) i == m_ResourceCount - 1 ? 0 : i + 1
 
 VkBool32 VulkanBase::volumetric_precompute()
 {
-	VmaAllocationCreateInfo allocCreateInfo{};
-	allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-
-	VkBufferCreateInfo cloudInfo{};
-	cloudInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	cloudInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-	cloudInfo.size = sizeof(CloudParameters);
-	cloudInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	m_CloudLayer = std::make_unique<Buffer>(m_Scope, cloudInfo, allocCreateInfo);
-
+	m_CloudLayer = VkBufferFactory::UniformBuffer(m_Scope, sizeof(CloudParameters));
 	SetCloudLayerSettings(CloudLayerProfile());
 
 	m_VolumeShape.Image = GRNoise::GenerateCloudShapeNoise(m_Scope, { 128u, 128u, 128u }, 1u, 4u);

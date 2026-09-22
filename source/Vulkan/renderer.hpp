@@ -27,7 +27,7 @@
 struct VulkanTexture : Texture
 {
 	std::shared_ptr<VulkanImage> Image = VK_NULL_HANDLE;
-	std::unique_ptr<VulkanImageView> View = VK_NULL_HANDLE;
+	std::shared_ptr<VulkanImageView> View = VK_NULL_HANDLE;
 
 public:
 	void reset()
@@ -40,7 +40,7 @@ public:
 struct VulkanTextureMultiView : Texture
 {
 	std::shared_ptr<VulkanImage> Image = VK_NULL_HANDLE;
-	std::vector<std::unique_ptr<VulkanImageView>> Views = {};
+	std::vector<std::shared_ptr<VulkanImageView>> Views = {};
 
 public:
 	void reset()
@@ -251,26 +251,26 @@ private:
 
 	std::vector<VulkanTextureMultiView> m_DepthHR = {};
 	
-	// std::vector<std::unique_ptr<VulkanImage>> m_DepthAttachmentsHR = {};
-	// std::vector<std::unique_ptr<VulkanImageView>> m_DepthViewsHR = {};
+	// std::vector<std::shared_ptr<VulkanImage>> m_DepthAttachmentsHR = {};
+	// std::vector<std::shared_ptr<VulkanImageView>> m_DepthViewsHR = {};
 	
-	std::vector<std::unique_ptr<VulkanImage>> m_HdrAttachmentsHR = {};
-	std::vector<std::unique_ptr<VulkanImageView>> m_HdrViewsHR = {};
+	std::vector<std::shared_ptr<VulkanImage>> m_HdrAttachmentsHR = {};
+	std::vector<std::shared_ptr<VulkanImageView>> m_HdrViewsHR = {};
 
-	std::vector<std::unique_ptr<VulkanImage>> m_DeferredAttachments = {};
-	std::vector<std::unique_ptr<VulkanImageView>> m_DeferredViews = {};
+	std::vector<std::shared_ptr<VulkanImage>> m_DeferredAttachments = {};
+	std::vector<std::shared_ptr<VulkanImageView>> m_DeferredViews = {};
 
-	std::vector<std::unique_ptr<VulkanImage>> m_BlurAttachments = {};
-	std::vector<std::unique_ptr<VulkanImageView>> m_BlurViews = {};
+	std::vector<std::shared_ptr<VulkanImage>> m_BlurAttachments = {};
+	std::vector<std::shared_ptr<VulkanImageView>> m_BlurViews = {};
 
-	std::vector<std::unique_ptr<VulkanImage>> m_NormalAttachments = {};
-	std::vector<std::unique_ptr<VulkanImageView>> m_NormalViews = {};
+	std::vector<std::shared_ptr<VulkanImage>> m_NormalAttachments = {};
+	std::vector<std::shared_ptr<VulkanImageView>> m_NormalViews = {};
 
-	std::vector<std::unique_ptr<VulkanImage>> m_HdrAttachmentsLR = {};
-	std::vector<std::unique_ptr<VulkanImageView>> m_HdrViewsLR = {};
+	std::vector<std::shared_ptr<VulkanImage>> m_HdrAttachmentsLR = {};
+	std::vector<std::shared_ptr<VulkanImageView>> m_HdrViewsLR = {};
 
-	std::vector<std::unique_ptr<VulkanImage>> m_DepthAttachmentsLR = {};
-	std::vector<std::unique_ptr<VulkanImageView>> m_DepthViewsLR = {};
+	std::vector<std::shared_ptr<VulkanImage>> m_DepthAttachmentsLR = {};
+	std::vector<std::shared_ptr<VulkanImageView>> m_DepthViewsLR = {};
 
 	// std::vector<VulkanTexture> m_DepthCopies = {};
 
@@ -279,23 +279,22 @@ private:
 	std::vector<VkFramebuffer> m_FramebuffersCP   = {};
 	std::vector<VkFramebuffer> m_FramebuffersPP   = {};
 
-	std::unique_ptr<GraphicsPipeline> m_CompositionPipeline = VK_NULL_HANDLE;
-	std::unique_ptr<GraphicsPipeline> m_PostProcessPipeline = VK_NULL_HANDLE;
-	std::unique_ptr<ComputePipeline> m_BlendingPipeline = VK_NULL_HANDLE;
-	std::unique_ptr<ComputePipeline> m_BlurSetupPipeline = VK_NULL_HANDLE;
-	std::unique_ptr<ComputePipeline> m_BlurHorizontalPipeline = VK_NULL_HANDLE;
-	std::unique_ptr<ComputePipeline> m_BlurVerticalPipeline = VK_NULL_HANDLE;
+	std::shared_ptr<GraphicsPipeline> m_CompositionPipeline = VK_NULL_HANDLE;
+	std::shared_ptr<GraphicsPipeline> m_PostProcessPipeline = VK_NULL_HANDLE;
+	std::shared_ptr<ComputePipeline> m_BlendingPipeline = VK_NULL_HANDLE;
+	std::shared_ptr<ComputePipeline> m_BlurSetupPipeline = VK_NULL_HANDLE;
+	std::shared_ptr<ComputePipeline> m_BlurHorizontalPipeline = VK_NULL_HANDLE;
+	std::shared_ptr<ComputePipeline> m_BlurVerticalPipeline = VK_NULL_HANDLE;
 
-	std::vector<std::unique_ptr<DescriptorSet>> m_SubpassDescriptors = {};
-	std::vector<std::unique_ptr<DescriptorSet>> m_BlendingDescriptors = {};
-	std::vector<std::unique_ptr<DescriptorSet>> m_CompositionDescriptors = {};
-	std::vector<std::unique_ptr<DescriptorSet>> m_BlurDescriptors = {};
-	std::vector<std::unique_ptr<DescriptorSet>> m_PostProcessDescriptors = {};
+	std::vector<std::shared_ptr<DescriptorSet>> m_SubpassDescriptors = {};
+	std::vector<std::shared_ptr<DescriptorSet>> m_BlendingDescriptors = {};
+	std::vector<std::shared_ptr<DescriptorSet>> m_CompositionDescriptors = {};
+	std::vector<std::shared_ptr<DescriptorSet>> m_BlurDescriptors = {};
+	std::vector<std::shared_ptr<DescriptorSet>> m_PostProcessDescriptors = {};
 
 	std::vector<VkSemaphore> m_SwapchainSemaphores = {};
 
 	std::vector<uint32_t> m_ImageIndex = {};
-	uint32_t m_ResourceIndex = 0;
 	uint32_t m_ResourceCount = 0;
 	uint64_t m_FrameCount = 0;
 
@@ -305,18 +304,18 @@ private:
 	/*
 	* Volumetrics resources
 	*/
-	std::vector<std::unique_ptr<DescriptorSet>> m_TemporalVolumetrics = {};
+	std::vector<std::shared_ptr<DescriptorSet>> m_TemporalVolumetrics = {};
 
-	std::unique_ptr<DescriptorSet> m_VolumetricsDescriptor = VK_NULL_HANDLE;
-	std::vector<std::unique_ptr<DescriptorSet>> m_UBOSkySets = {};
+	std::shared_ptr<DescriptorSet> m_VolumetricsDescriptor = VK_NULL_HANDLE;
+	std::vector<std::shared_ptr<DescriptorSet>> m_UBOSkySets = {};
 
-	std::vector<std::unique_ptr<Buffer>> m_UBOSkyBuffers = {};
-	std::unique_ptr<Buffer> m_CloudLayer = {};
+	std::vector<std::shared_ptr<GVkBuffer>> m_UBOSkyBuffers = {};
+	std::shared_ptr<GVkBuffer> m_CloudLayer = {};
 
-	std::unique_ptr<ComputePipeline> m_VolumetricsAbovePipeline = VK_NULL_HANDLE;
-	std::unique_ptr<ComputePipeline> m_VolumetricsBetweenPipeline = VK_NULL_HANDLE;
-	std::unique_ptr<ComputePipeline> m_VolumetricsUnderPipeline = VK_NULL_HANDLE;
-	std::unique_ptr<ComputePipeline> m_VolumetricsComposePipeline = VK_NULL_HANDLE;
+	std::shared_ptr<ComputePipeline> m_VolumetricsAbovePipeline = VK_NULL_HANDLE;
+	std::shared_ptr<ComputePipeline> m_VolumetricsBetweenPipeline = VK_NULL_HANDLE;
+	std::shared_ptr<ComputePipeline> m_VolumetricsUnderPipeline = VK_NULL_HANDLE;
+	std::shared_ptr<ComputePipeline> m_VolumetricsComposePipeline = VK_NULL_HANDLE;
 
 	VulkanTexture m_VolumeShape = {};
 	VulkanTexture m_VolumeDetail = {};
@@ -331,19 +330,19 @@ private:
 	/*
 	* PBR resources
 	*/
-	std::unique_ptr<ComputePipeline> m_CubemapPipeline = VK_NULL_HANDLE;
-	std::unique_ptr<ComputePipeline> m_CubemapMipPipeline = VK_NULL_HANDLE;
-	std::unique_ptr<ComputePipeline> m_ConvolutionPipeline = VK_NULL_HANDLE;
-	std::unique_ptr<ComputePipeline> m_SpecularIBLPipeline = VK_NULL_HANDLE;
+	std::shared_ptr<ComputePipeline> m_CubemapPipeline = VK_NULL_HANDLE;
+	std::shared_ptr<ComputePipeline> m_CubemapMipPipeline = VK_NULL_HANDLE;
+	std::shared_ptr<ComputePipeline> m_ConvolutionPipeline = VK_NULL_HANDLE;
+	std::shared_ptr<ComputePipeline> m_SpecularIBLPipeline = VK_NULL_HANDLE;
 
-	std::vector<std::unique_ptr<DescriptorSet>> m_CubemapDescriptors = {};
-	std::vector<std::unique_ptr<DescriptorSet>> m_CubemapMipDescriptors = {};
-	std::vector<std::unique_ptr<DescriptorSet>> m_ConvolutionDescriptors = {};
-	std::vector<std::unique_ptr<DescriptorSet>> m_SpecularDescriptors = {};
-	std::vector<std::unique_ptr<DescriptorSet>> m_DiffuseDescriptors = {};
+	std::vector<std::shared_ptr<DescriptorSet>> m_CubemapDescriptors = {};
+	std::vector<std::shared_ptr<DescriptorSet>> m_CubemapMipDescriptors = {};
+	std::vector<std::shared_ptr<DescriptorSet>> m_ConvolutionDescriptors = {};
+	std::vector<std::shared_ptr<DescriptorSet>> m_SpecularDescriptors = {};
+	std::vector<std::shared_ptr<DescriptorSet>> m_DiffuseDescriptors = {};
 
-	std::unique_ptr<Buffer> m_DiffusePrecompute = VK_NULL_HANDLE;
-	std::unique_ptr<Buffer> m_SpecularPrecompute = VK_NULL_HANDLE;
+	std::shared_ptr<GVkBuffer> m_DiffusePrecompute = VK_NULL_HANDLE;
+	std::shared_ptr<GVkBuffer> m_SpecularPrecompute = VK_NULL_HANDLE;
 
 	VulkanTexture m_BRDFLUT = {};
 	std::vector<VulkanTexture> m_DiffuseIrradience = {};
@@ -352,34 +351,34 @@ private:
 	/*
 	* Terrain resources
 	*/
-	std::unique_ptr<GraphicsPipeline> m_TerrainTexturingPipeline = VK_NULL_HANDLE;
-	std::unique_ptr<ComputePipeline> m_TerrainCompute = {};
-	std::unique_ptr<ComputePipeline> m_TerrainCompose = {};
-	std::unique_ptr<ComputePipeline> m_GrassOcclude   = {};
-	std::unique_ptr<GraphicsPipeline> m_GrassPipeline = {};
+	std::shared_ptr<GraphicsPipeline> m_TerrainTexturingPipeline = VK_NULL_HANDLE;
+	std::shared_ptr<ComputePipeline> m_TerrainCompute = {};
+	std::shared_ptr<ComputePipeline> m_TerrainCompose = {};
+	std::shared_ptr<ComputePipeline> m_GrassOcclude   = {};
+	std::shared_ptr<GraphicsPipeline> m_GrassPipeline = {};
 
-	std::unique_ptr<Buffer> m_TerrainLayer = {};
-	std::unique_ptr<Buffer> m_GrassIndirectRef = {};
-	std::vector<std::unique_ptr<Buffer>> m_GrassIndirect  = {};
-	std::vector<std::unique_ptr<Buffer>> m_GrassPositions = {};
-	std::vector<std::unique_ptr<Buffer>> TerrainVBs = {};
+	std::shared_ptr<GVkBuffer> m_TerrainLayer = {};
+	std::shared_ptr<GVkBuffer> m_GrassIndirectRef = {};
+	std::vector<std::shared_ptr<GVkBuffer>> m_GrassIndirect  = {};
+	std::vector<std::shared_ptr<GVkBuffer>> m_GrassPositions = {};
+	std::vector<std::shared_ptr<GVkBuffer>> TerrainVBs = {};
 
 	std::vector<VulkanTexture> m_TerrainLUT = {};
 
-	std::vector<std::unique_ptr<DescriptorSet>> m_TerrainSet = {};
-	std::vector<std::unique_ptr<DescriptorSet>> m_TerrainDrawSet = {};
-	std::vector<std::unique_ptr<DescriptorSet>> m_GrassSet = {};
-	std::vector<std::unique_ptr<DescriptorSet>> m_GrassDrawSet = {};
+	std::vector<std::shared_ptr<DescriptorSet>> m_TerrainSet = {};
+	std::vector<std::shared_ptr<DescriptorSet>> m_TerrainDrawSet = {};
+	std::vector<std::shared_ptr<DescriptorSet>> m_GrassSet = {};
+	std::vector<std::shared_ptr<DescriptorSet>> m_GrassDrawSet = {};
 
 	uint32_t m_TerrainDispatches = 0u;
 	/*
 	* Common
 	*/
-	std::vector<std::unique_ptr<Buffer>> m_UBOTempBuffers = {};
-	std::vector<std::unique_ptr<Buffer>> m_UBOBuffers = {};
+	std::vector<std::shared_ptr<GVkBuffer>> m_UBOTempBuffers = {};
+	std::vector<std::shared_ptr<GVkBuffer>> m_UBOBuffers = {};
 
-	std::vector<std::unique_ptr<DescriptorSet>> m_UBOSets = {};
-	std::vector<std::unique_ptr<DescriptorSet>> m_UBOTempSets = {};
+	std::vector<std::shared_ptr<DescriptorSet>> m_UBOSets = {};
+	std::vector<std::shared_ptr<DescriptorSet>> m_UBOTempSets = {};
 
 	VkInstance m_VkInstance = VK_NULL_HANDLE;
 	VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
@@ -436,7 +435,7 @@ public:
 	*
 	* @return Vulkan image memory
 	*/
-	std::unique_ptr<VulkanTexture> _loadImage(const std::vector<std::string>& path, VkFormat format) const;
+	std::shared_ptr<VulkanTexture> _loadImage(const std::vector<std::string>& path, VkFormat format) const;
 	/*
 	* 
 	*/
@@ -487,15 +486,15 @@ private:
 
 	VkBool32 brdf_precompute();
 
-	VkBool32 terrain_init(const Buffer& VB, const GR::Shapes::GeoClipmap& shape);
+	VkBool32 terrain_init(const GVkBuffer& VB, const GR::Shapes::GeoClipmap& shape);
 
-	std::unique_ptr<DescriptorSet> create_pbr_set(const VulkanImageView& albedo, const VulkanImageView& nh, const VulkanImageView& arm) const;
+	std::shared_ptr<DescriptorSet> create_pbr_set(const VulkanImageView& albedo, const VulkanImageView& nh, const VulkanImageView& arm) const;
 	
-	std::unique_ptr<GraphicsPipeline> create_pbr_pipeline(const DescriptorSet& set) const;
+	std::shared_ptr<GraphicsPipeline> create_pbr_pipeline(const DescriptorSet& set) const;
 
-	std::unique_ptr<DescriptorSet> create_terrain_set(const VulkanImageView& albedo, const VulkanImageView& nh, const VulkanImageView& arm) const;
+	std::shared_ptr<DescriptorSet> create_terrain_set(const VulkanImageView& albedo, const VulkanImageView& nh, const VulkanImageView& arm) const;
 
-	std::unique_ptr<GraphicsPipeline> create_terrain_pipeline(const DescriptorSet& set, const GR::Shapes::GeoClipmap& shape) const;
+	std::shared_ptr<GraphicsPipeline> create_terrain_pipeline(const DescriptorSet& set, const GR::Shapes::GeoClipmap& shape) const;
 
 #ifdef VALIDATION
 	VkDebugUtilsMessengerEXT m_DebugMessenger;

@@ -35,9 +35,9 @@ public:
 		imageInfos.reserve(32);
 	};
 
-	DescriptorSetDescriptor& AddUniformBuffer(uint32_t binding, VkShaderStageFlags stages, const Buffer& buffer);
+	DescriptorSetDescriptor& AddUniformBuffer(uint32_t binding, VkShaderStageFlags stages, const GVkBuffer& buffer);
 
-	DescriptorSetDescriptor& AddStorageBuffer(uint32_t binding, VkShaderStageFlags stages, const Buffer& buffer);
+	DescriptorSetDescriptor& AddStorageBuffer(uint32_t binding, VkShaderStageFlags stages, const GVkBuffer& buffer);
 
 	DescriptorSetDescriptor& AddImageSampler(uint32_t binding, VkShaderStageFlags stages, VkImageView view, VkSampler sampler, VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 

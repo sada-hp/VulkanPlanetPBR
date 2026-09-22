@@ -1,5 +1,6 @@
 #include "pch.hpp"
 #include "renderer.hpp"
+#include "Factories/VkBufferFactory.h"
 
 #define WRAPL(i) (i == 0 ? m_ResourceCount : i) - 1
 #define WRAPR(i) i == m_ResourceCount - 1 ? 0 : i + 1
@@ -11,16 +12,16 @@ void VulkanBase::_drawTerrain(const PBRObject& gro, const PBRConstants& constant
 
 	assert(m_InFrame, "Call BeginFrame first!");
 
-	const VkCommandBuffer& cmd = m_DeferredSync[m_ResourceIndex].Commands;
+	const VkCommandBuffer& cmd = m_DeferredSync[m_Scope.GetResourceIndex()].Commands;
 	const VkDeviceSize offsets[] = { 0 };
 
-	m_UBOSets[m_ResourceIndex]->BindSet(0, cmd, *gro.pipeline);
-	m_TerrainDrawSet[m_ResourceIndex]->BindSet(1, cmd, *gro.pipeline);
+	m_UBOSets[m_Scope.GetResourceIndex()]->BindSet(0, cmd, *gro.pipeline);
+	m_TerrainDrawSet[m_Scope.GetResourceIndex()]->BindSet(1, cmd, *gro.pipeline);
 
 	gro.pipeline->PushConstants(cmd, &constants.Offset, PBRConstants::VertexSize(), 0u, VK_SHADER_STAGE_VERTEX_BIT);
 	gro.pipeline->BindPipeline(cmd);
 
-	vkCmdBindVertexBuffers(cmd, 0, 1, &TerrainVBs[m_ResourceIndex]->GetBuffer(), offsets);
+	vkCmdBindVertexBuffers(cmd, 0, 1, &TerrainVBs[m_Scope.GetResourceIndex()]->GetBuffer(), offsets);
 	vkCmdBindIndexBuffer(cmd, gro.mesh->GetIndexBuffer()->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
 	vkCmdDrawIndexed(cmd, gro.mesh->GetIndicesCount(), 1, 0, 0, 0);
 
@@ -28,17 +29,17 @@ void VulkanBase::_drawTerrain(const PBRObject& gro, const PBRConstants& constant
 	if (glm::length(m_Camera.Transform.offset) < Rt && m_GrassPipeline)
 	{
 		m_GrassPipeline->BindPipeline(cmd);
-		m_UBOSets[m_ResourceIndex]->BindSet(0, cmd, *m_GrassPipeline);
-		m_GrassDrawSet[m_ResourceIndex]->BindSet(1, cmd, *m_GrassPipeline);
-		vkCmdDrawIndirectCount(m_DeferredSync[m_ResourceIndex].Commands, m_GrassIndirect[m_ResourceIndex]->GetBuffer(), 0, m_GrassIndirect[m_ResourceIndex]->GetBuffer(), m_GrassIndirect[m_ResourceIndex]->GetSize() - sizeof(uint32_t), m_TerrainLUT[0].Image->GetArrayLayers(), sizeof(VkDrawIndirectCommand));
+		m_UBOSets[m_Scope.GetResourceIndex()]->BindSet(0, cmd, *m_GrassPipeline);
+		m_GrassDrawSet[m_Scope.GetResourceIndex()]->BindSet(1, cmd, *m_GrassPipeline);
+		vkCmdDrawIndirectCount(m_DeferredSync[m_Scope.GetResourceIndex()].Commands, m_GrassIndirect[m_Scope.GetResourceIndex()]->GetBuffer(), 0, m_GrassIndirect[m_Scope.GetResourceIndex()]->GetBuffer(), m_GrassIndirect[m_Scope.GetResourceIndex()]->GetSize() - sizeof(uint32_t), m_TerrainLUT[0].Image->GetArrayLayers(), sizeof(VkDrawIndirectCommand));
 	}
 
-	vkCmdNextSubpass(m_DeferredSync[m_ResourceIndex].Commands, VK_SUBPASS_CONTENTS_INLINE);
+	vkCmdNextSubpass(m_DeferredSync[m_Scope.GetResourceIndex()].Commands, VK_SUBPASS_CONTENTS_INLINE);
 
 	m_TerrainTexturingPipeline->PushConstants(cmd, &constants.Color, PBRConstants::FragmentSize(), 0.0, VK_SHADER_STAGE_FRAGMENT_BIT);
-	m_UBOSets[m_ResourceIndex]->BindSet(0, cmd, *m_TerrainTexturingPipeline);
+	m_UBOSets[m_Scope.GetResourceIndex()]->BindSet(0, cmd, *m_TerrainTexturingPipeline);
 	gro.descriptorSet->BindSet(1, cmd, *m_TerrainTexturingPipeline);
-	m_SubpassDescriptors[m_ResourceIndex]->BindSet(2, cmd, *m_TerrainTexturingPipeline);
+	m_SubpassDescriptors[m_Scope.GetResourceIndex()]->BindSet(2, cmd, *m_TerrainTexturingPipeline);
 	m_TerrainTexturingPipeline->BindPipeline(cmd);
 	vkCmdDraw(cmd, 3, 1, 0, 0);
 }
@@ -54,7 +55,7 @@ void VulkanBase::_updateTerrain(entt::entity ent, entt::registry& registry) cons
 	gro.dirty = false;
 }
 
-std::unique_ptr<DescriptorSet> VulkanBase::create_terrain_set(const VulkanImageView& albedo
+std::shared_ptr<DescriptorSet> VulkanBase::create_terrain_set(const VulkanImageView& albedo
 	, const VulkanImageView& nh
 	, const VulkanImageView& arm) const
 {
@@ -66,7 +67,7 @@ std::unique_ptr<DescriptorSet> VulkanBase::create_terrain_set(const VulkanImageV
 		.Allocate(m_Scope);
 }
 
-std::unique_ptr<GraphicsPipeline> VulkanBase::create_terrain_pipeline(const DescriptorSet& set, const GR::Shapes::GeoClipmap& shape) const
+std::shared_ptr<GraphicsPipeline> VulkanBase::create_terrain_pipeline(const DescriptorSet& set, const GR::Shapes::GeoClipmap& shape) const
 {
 	auto vertAttributes = TerrainVertex::getAttributeDescriptions();
 	auto vertBindings = TerrainVertex::getBindingDescription();
@@ -96,21 +97,9 @@ std::unique_ptr<GraphicsPipeline> VulkanBase::create_terrain_pipeline(const Desc
 		.Construct(m_Scope);
 }
 
-VkBool32 VulkanBase::terrain_init(const Buffer& VB, const GR::Shapes::GeoClipmap& shape)
+VkBool32 VulkanBase::terrain_init(const GVkBuffer& VB, const GR::Shapes::GeoClipmap& shape)
 {
-	std::vector<uint32_t> queueFamilies = FindDeviceQueues(m_Scope.GetPhysicalDevice(), { VK_QUEUE_GRAPHICS_BIT, VK_QUEUE_COMPUTE_BIT });
-	std::sort(queueFamilies.begin(), queueFamilies.end());
-	queueFamilies.resize(std::distance(queueFamilies.begin(), std::unique(queueFamilies.begin(), queueFamilies.end())));
-
-	VmaAllocationCreateInfo layerAllocCreateInfo{};
-	layerAllocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-
-	VkBufferCreateInfo terrainLayerInfo{};
-	terrainLayerInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	terrainLayerInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-	terrainLayerInfo.size = 100 * sizeof(TerrainLayerProfile) + sizeof(TerrainLayerProfile);
-	terrainLayerInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	m_TerrainLayer = std::make_unique<Buffer>(m_Scope, terrainLayerInfo, layerAllocCreateInfo);
+	m_TerrainLayer = VkBufferFactory::Buffer(m_Scope, EBufferFlags::Storage, 100 * sizeof(TerrainLayerProfile) + sizeof(TerrainLayerProfile));
 
 	int Layers = 1;
 	float Scale = 1e1;
@@ -129,18 +118,7 @@ VkBool32 VulkanBase::terrain_init(const Buffer& VB, const GR::Shapes::GeoClipmap
 
 	for (uint32_t i = 0; i < TerrainVBs.size(); i++)
 	{
-		VkBufferCreateInfo sbInfo{};
-		sbInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-		sbInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-		sbInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		sbInfo.queueFamilyIndexCount = queueFamilies.size();
-		sbInfo.pQueueFamilyIndices = queueFamilies.data();
-		sbInfo.size = VB.GetDescriptor().range;
-
-		VmaAllocationCreateInfo sbAlloc{};
-		sbAlloc.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-
-		TerrainVBs[i] = std::make_unique<Buffer>(m_Scope, sbInfo, sbAlloc);
+		TerrainVBs[i] = VkBufferFactory::Buffer(m_Scope, EBufferFlags::Vertex | EBufferFlags::Storage, VB.GetDescriptor().range);
 
 		VkBufferCopy region{};
 		region.size = VB.GetDescriptor().range;
@@ -160,6 +138,10 @@ VkBool32 VulkanBase::terrain_init(const Buffer& VB, const GR::Shapes::GeoClipmap
 	const uint32_t LUTExtent = static_cast<uint32_t>(2 * (m + 2) + 1);
 
 	m_TerrainDispatches = VertexCount / 32 + static_cast<uint32_t>(VertexCount % 32 > 0);
+
+	std::vector<uint32_t> queueFamilies = FindDeviceQueues(m_Scope.GetPhysicalDevice(), { VK_QUEUE_GRAPHICS_BIT, VK_QUEUE_COMPUTE_BIT, VK_QUEUE_TRANSFER_BIT });
+	std::sort(queueFamilies.begin(), queueFamilies.end());
+	queueFamilies.resize(std::distance(queueFamilies.begin(), std::unique(queueFamilies.begin(), queueFamilies.end())));
 
 	VkImageCreateInfo noiseInfo{};
 	noiseInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -217,8 +199,8 @@ VkBool32 VulkanBase::terrain_init(const Buffer& VB, const GR::Shapes::GeoClipmap
 	::BeginOneTimeSubmitCmd(clearCMD);
 	for (uint32_t i = 0; i < m_ResourceCount; i++)
 	{
-		m_TerrainLUT[i].Image = std::make_unique<VulkanImage>(m_Scope, noiseInfo, noiseAllocCreateInfo);
-		m_TerrainLUT[i].View = std::make_unique<VulkanImageView>(m_Scope, *m_TerrainLUT[i].Image);
+		m_TerrainLUT[i].Image = std::make_shared<VulkanImage>(m_Scope, noiseInfo, noiseAllocCreateInfo);
+		m_TerrainLUT[i].View = std::make_shared<VulkanImageView>(m_Scope, *m_TerrainLUT[i].Image);
 
 		vkCmdClearColorImage(clearCMD, m_TerrainLUT[i].Image->GetImage(), VK_IMAGE_LAYOUT_GENERAL, &Color, 1, &m_TerrainLUT[i].Image->GetSubResourceRange());
 
@@ -234,20 +216,9 @@ VkBool32 VulkanBase::terrain_init(const Buffer& VB, const GR::Shapes::GeoClipmap
 	uint32_t firstRing = m_TerrainLUT[0].Image->GetExtent().width * m_TerrainLUT[0].Image->GetExtent().height;
 	uint32_t nextRings = firstRing - glm::ceil(float(m_TerrainLUT[0].Image->GetExtent().width) / 2.0) * glm::ceil(float(m_TerrainLUT[0].Image->GetExtent().height) / 2.0);
 
-	VmaAllocationCreateInfo grassAllocCreateInfo{};
-	grassAllocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-
-	VkBufferCreateInfo grassInfo{};
-	grassInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	grassInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	grassInfo.size = sizeof(VkDrawIndirectCommand) * (shape.m_Rings + 2);
-	grassInfo.queueFamilyIndexCount = queueFamilies.size();
-	grassInfo.pQueueFamilyIndices = queueFamilies.data();
-	grassInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
-
 	if (shape.m_GrassRings > 0)
 	{
-		m_GrassIndirectRef = std::make_unique<Buffer>(m_Scope, grassInfo, grassAllocCreateInfo);
+		m_GrassIndirectRef = VkBufferFactory::Buffer(m_Scope, EBufferFlags::TransferSrc | EBufferFlags::Indirect, sizeof(VkDrawIndirectCommand) * (shape.m_Rings + 2));
 
 		VkDispatchIndirectCommand computeCommand = { 0, 1, 1 };
 		VkDrawIndirectCommand* commandsDraw = new VkDrawIndirectCommand[shape.m_Rings];
@@ -272,19 +243,12 @@ VkBool32 VulkanBase::terrain_init(const Buffer& VB, const GR::Shapes::GeoClipmap
 		delete[] commandsDraw;
 	}
 
-	grassAllocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-
 	for (uint32_t i = 0; i < m_TerrainLUT.size(); i++)
 	{
 		if (shape.m_GrassRings > 0)
 		{
-			grassInfo.size = sizeof(VkDrawIndirectCommand) * (shape.m_Rings + 1);
-			grassInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
-			m_GrassIndirect[i] = std::make_unique<Buffer>(m_Scope, grassInfo, grassAllocCreateInfo);
-
-			grassInfo.size = sizeof(glm::ivec4) * (firstRing + nextRings * (shape.m_GrassRings - 1));
-			grassInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-			m_GrassPositions[i] = std::make_unique<Buffer>(m_Scope, grassInfo, grassAllocCreateInfo);
+			m_GrassIndirect[i] = VkBufferFactory::Buffer(m_Scope, EBufferFlags::Storage | EBufferFlags::Indirect, sizeof(VkDrawIndirectCommand) * (shape.m_Rings + 1));
+			m_GrassPositions[i] = VkBufferFactory::StorageBuffer(m_Scope, sizeof(glm::ivec4) * (firstRing + nextRings * (shape.m_GrassRings - 1)));
 
 			m_GrassSet[i] = DescriptorSetDescriptor()
 				.AddImageSampler(0, VK_SHADER_STAGE_COMPUTE_BIT, m_TerrainLUT[i].View->GetImageView(), m_Scope.GetSampler(ESamplerType::BillinearClamp, 1))
@@ -349,7 +313,7 @@ VkBool32 VulkanBase::terrain_init(const Buffer& VB, const GR::Shapes::GeoClipmap
 			.SetShaderName("terrain_compose_comp")
 			.Construct(m_Scope);
 
-		std::unique_ptr<DescriptorSet> dummy = create_terrain_set(*m_DefaultWhite->Views[1], *m_DefaultNormal->Views[1], *m_DefaultARM->Views[1]);
+		std::shared_ptr<DescriptorSet> dummy = create_terrain_set(*m_DefaultWhite->Views[1], *m_DefaultNormal->Views[1], *m_DefaultARM->Views[1]);
 
 		if (shape.m_GrassRings > 0)
 		{

@@ -155,9 +155,9 @@ struct VulkanMesh
 
 	~VulkanMesh() = default;
 
-	std::shared_ptr<const Buffer> GetVertexBuffer() const { return vertexBuffer; };
+	std::shared_ptr<GVkBuffer> GetVertexBuffer() const { return vertexBuffer; };
 
-	std::shared_ptr<const Buffer> GetIndexBuffer() const { return indexBuffer; };
+	std::shared_ptr<GVkBuffer> GetIndexBuffer() const { return indexBuffer; };
 
 	uint32_t GetIndicesCount() const { return indicesCount; };
 
@@ -166,8 +166,9 @@ struct VulkanMesh
 	VkIndexType GetIndexType() const { return indexType; };
 
 private:
-	std::shared_ptr<Buffer> vertexBuffer = {};
-	std::shared_ptr<Buffer> indexBuffer = {};
+	std::shared_ptr<GVkBuffer> vertexBuffer = VK_NULL_HANDLE;
+	std::shared_ptr<GVkBuffer> indexBuffer = VK_NULL_HANDLE;
+
 	uint32_t indicesCount = 0;
 	uint32_t verticesCount = 0;
 	VkIndexType indexType;

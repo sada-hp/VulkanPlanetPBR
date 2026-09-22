@@ -1,5 +1,6 @@
 #include "pch.hpp"
 #include "renderer.hpp"
+#include "Factories/VkBufferFactory.h"
 
 #define WRAPL(i) (i == 0 ? m_ResourceCount : i) - 1
 #define WRAPR(i) i == m_ResourceCount - 1 ? 0 : i + 1
@@ -11,10 +12,10 @@ void VulkanBase::_drawObject(const PBRObject& gro, const PBRConstants& constants
 
 	assert(m_InFrame, "Call BeginFrame first!");
 
-	const VkCommandBuffer& cmd = m_DeferredSync[m_ResourceIndex].Commands;
+	const VkCommandBuffer& cmd = m_DeferredSync[m_Scope.GetResourceIndex()].Commands;
 	const VkDeviceSize offsets[] = { 0 };
 
-	m_UBOSets[m_ResourceIndex]->BindSet(0, cmd, *gro.pipeline);
+	m_UBOSets[m_Scope.GetResourceIndex()]->BindSet(0, cmd, *gro.pipeline);
 	gro.descriptorSet->BindSet(1, cmd, *gro.pipeline);
 	gro.pipeline->PushConstants(cmd, &constants.Offset, PBRConstants::VertexSize(), 0u, VK_SHADER_STAGE_VERTEX_BIT);
 	gro.pipeline->PushConstants(cmd, &constants.Color, PBRConstants::FragmentSize(), PBRConstants::VertexSize(), VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -36,7 +37,7 @@ void VulkanBase::_updateObject(entt::entity ent, entt::registry& registry) const
 	gro.dirty = false;
 }
 
-std::unique_ptr<DescriptorSet> VulkanBase::create_pbr_set(const VulkanImageView& albedo
+std::shared_ptr<DescriptorSet> VulkanBase::create_pbr_set(const VulkanImageView& albedo
 	, const VulkanImageView& nh
 	, const VulkanImageView& arm) const
 {
@@ -47,7 +48,7 @@ std::unique_ptr<DescriptorSet> VulkanBase::create_pbr_set(const VulkanImageView&
 		.Allocate(m_Scope);
 }
 
-std::unique_ptr<GraphicsPipeline> VulkanBase::create_pbr_pipeline(const DescriptorSet& set) const
+std::shared_ptr<GraphicsPipeline> VulkanBase::create_pbr_pipeline(const DescriptorSet& set) const
 {
 	auto vertAttributes = MeshVertex::getAttributeDescriptions();
 	auto vertBindings = MeshVertex::getBindingDescription();
@@ -99,17 +100,17 @@ VkBool32 VulkanBase::brdf_precompute()
 		hdrInfo.pQueueFamilyIndices = queueFamilies.data();
 		hdrInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
 
-		m_DiffuseIrradience[i].Image = std::make_unique<VulkanImage>(m_Scope, hdrInfo, allocCreateInfo);
-		m_DiffuseIrradience[i].View = std::make_unique<VulkanImageView>(m_Scope, *m_DiffuseIrradience[i].Image);
+		m_DiffuseIrradience[i].Image = std::make_shared<VulkanImage>(m_Scope, hdrInfo, allocCreateInfo);
+		m_DiffuseIrradience[i].View = std::make_shared<VulkanImageView>(m_Scope, *m_DiffuseIrradience[i].Image);
 
 		hdrInfo.usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 		hdrInfo.mipLevels = static_cast<uint32_t>(std::floor(std::log2(CubeR))) + 1;
-		m_SpecularLUT[i].Image = std::make_unique<VulkanImage>(m_Scope, hdrInfo, allocCreateInfo);
-		m_SpecularLUT[i].Views.emplace_back(std::make_unique<VulkanImageView>(m_Scope, *m_SpecularLUT[i].Image));
+		m_SpecularLUT[i].Image = std::make_shared<VulkanImage>(m_Scope, hdrInfo, allocCreateInfo);
+		m_SpecularLUT[i].Views.emplace_back(std::make_shared<VulkanImageView>(m_Scope, *m_SpecularLUT[i].Image));
 
 		hdrInfo.arrayLayers = 12;
-		m_CubemapLUT[i].Image = std::make_unique<VulkanImage>(m_Scope, hdrInfo, allocCreateInfo);
-		m_CubemapLUT[i].Views.emplace_back(std::make_unique<VulkanImageView>(m_Scope, *m_CubemapLUT[i].Image));
+		m_CubemapLUT[i].Image = std::make_shared<VulkanImage>(m_Scope, hdrInfo, allocCreateInfo);
+		m_CubemapLUT[i].Views.emplace_back(std::make_shared<VulkanImageView>(m_Scope, *m_CubemapLUT[i].Image));
 
 		m_SpecularLUT[i].Views.reserve(hdrInfo.mipLevels + 1);
 		m_CubemapLUT[i].Views.reserve(hdrInfo.mipLevels + 1);
@@ -118,12 +119,12 @@ VkBool32 VulkanBase::brdf_precompute()
 		{
 			subRes.baseMipLevel = j;
 			subRes.levelCount = 1u;
-			m_SpecularLUT[i].Views.emplace_back(std::make_unique<VulkanImageView>(m_Scope, *m_SpecularLUT[i].Image, subRes));
-			m_CubemapLUT[i].Views.emplace_back(std::make_unique<VulkanImageView>(m_Scope, *m_CubemapLUT[i].Image, subRes));
+			m_SpecularLUT[i].Views.emplace_back(std::make_shared<VulkanImageView>(m_Scope, *m_SpecularLUT[i].Image, subRes));
+			m_CubemapLUT[i].Views.emplace_back(std::make_shared<VulkanImageView>(m_Scope, *m_CubemapLUT[i].Image, subRes));
 		}
 	}
 
-	std::unique_ptr<GraphicsPipeline> m_IntegrationPipeline = GraphicsPipelineDescriptor()
+	auto m_IntegrationPipeline = GraphicsPipelineDescriptor()
 		.SetShaderStage("fullscreen", VK_SHADER_STAGE_VERTEX_BIT)
 		.SetShaderStage("brdf_integrate_frag", VK_SHADER_STAGE_FRAGMENT_BIT)
 		.SetRenderPass(m_Scope.GetSimplePass(), 0)
@@ -144,8 +145,8 @@ VkBool32 VulkanBase::brdf_precompute()
 	bimageInfo.queueFamilyIndexCount = queueFamilies.size();
 	bimageInfo.pQueueFamilyIndices = queueFamilies.data();
 
-	m_BRDFLUT.Image = std::make_unique<VulkanImage>(m_Scope, bimageInfo, allocCreateInfo);
-	m_BRDFLUT.View = std::make_unique<VulkanImageView>(m_Scope, *m_BRDFLUT.Image);
+	m_BRDFLUT.Image = std::make_shared<VulkanImage>(m_Scope, bimageInfo, allocCreateInfo);
+	m_BRDFLUT.View = std::make_shared<VulkanImageView>(m_Scope, *m_BRDFLUT.Image);
 
 	VkFramebuffer Framebuffer;
 	CreateFramebuffer(m_Scope.GetDevice(), m_Scope.GetCubemapPass(), { m_BRDFLUT.Image->GetExtent().width, m_BRDFLUT.Image->GetExtent().height, 1 }, { m_BRDFLUT.View->GetImageView() }, &Framebuffer);
@@ -239,8 +240,7 @@ VkBool32 VulkanBase::brdf_precompute()
 	bufInfo.queueFamilyIndexCount = queueFamilies.size();
 	bufInfo.pQueueFamilyIndices = queueFamilies.data();
 	bufInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-	m_DiffusePrecompute = std::make_unique<Buffer>(m_Scope, bufInfo, bufallocCreateInfo);
-	m_DiffusePrecompute->Update(diffuseData.data.data(), sizeof(glm::vec4) * diffuseData.data.size());
+	m_DiffusePrecompute = VkBufferFactory::StorageBuffer(m_Scope, sizeof(glm::vec4) * diffuseData.data.size(), diffuseData.data.data());
 
 	std::vector<glm::vec4> specSamples;
 	const int specSamplesCount = 32;
@@ -263,8 +263,7 @@ VkBool32 VulkanBase::brdf_precompute()
 		specSamples.emplace_back(sample);
 	}
 	bufInfo.size = sizeof(glm::vec4) * specSamples.size();
-	m_SpecularPrecompute = std::make_unique<Buffer>(m_Scope, bufInfo, bufallocCreateInfo);
-	m_SpecularPrecompute->Update(specSamples.data(), sizeof(glm::vec4) * specSamples.size());
+	m_SpecularPrecompute = VkBufferFactory::StorageBuffer(m_Scope, sizeof(glm::vec4) * specSamples.size(), specSamples.data());
 
 	VkSampler SamplerPoint = m_Scope.GetSampler(ESamplerType::PointClamp, 1);
 	VkSampler SamplerLinear = m_Scope.GetSampler(ESamplerType::LinearClamp, 1);

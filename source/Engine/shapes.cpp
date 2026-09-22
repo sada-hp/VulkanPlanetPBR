@@ -7,7 +7,7 @@
 
 namespace GR
 {
-	std::unique_ptr<VulkanMesh> Shapes::Cube::Generate(const RenderScope& Scope, GeometryDescriptor* Geometry) const
+	std::shared_ptr<VulkanMesh> Shapes::Cube::Generate(const RenderScope& Scope, GeometryDescriptor* Geometry) const
 	{
 		std::vector<MeshVertex> vertices;
 		std::vector<uint32_t> indices;
@@ -168,15 +168,15 @@ namespace GR
 			for (uint32_t i = 0; i < indices.size(); i++)
 				indices16.push_back(static_cast<uint16_t>(indices[i]));
 
-			return std::make_unique<VulkanMesh>(Scope, vertices.data(), vertices.size(), indices16.data(), indices16.size());
+			return std::make_shared<VulkanMesh>(Scope, vertices.data(), vertices.size(), indices16.data(), indices16.size());
 		}
 		else
 		{
-			return std::make_unique<VulkanMesh>(Scope, vertices.data(), vertices.size(), indices.data(), indices.size());
+			return std::make_shared<VulkanMesh>(Scope, vertices.data(), vertices.size(), indices.data(), indices.size());
 		}
 	}
 
-	std::unique_ptr<VulkanMesh> Shapes::Plane::Generate(const RenderScope& Scope, GeometryDescriptor* Geometry) const
+	std::shared_ptr<VulkanMesh> Shapes::Plane::Generate(const RenderScope& Scope, GeometryDescriptor* Geometry) const
 	{
 		std::vector<MeshVertex> vertices;
 		std::vector<uint32_t> indices;
@@ -226,15 +226,15 @@ namespace GR
 			for (uint32_t i = 0; i < indices.size(); i++)
 				indices16.push_back(static_cast<uint16_t>(indices[i]));
 
-			return std::make_unique<VulkanMesh>(Scope, vertices.data(), vertices.size(), indices16.data(), indices16.size());
+			return std::make_shared<VulkanMesh>(Scope, vertices.data(), vertices.size(), indices16.data(), indices16.size());
 		}
 		else
 		{
-			return std::make_unique<VulkanMesh>(Scope, vertices.data(), vertices.size(), indices.data(), indices.size());
+			return std::make_shared<VulkanMesh>(Scope, vertices.data(), vertices.size(), indices.data(), indices.size());
 		}
 	}
 
-	std::unique_ptr<VulkanMesh> Shapes::Sphere::Generate(const RenderScope& Scope, GeometryDescriptor* Geometry) const
+	std::shared_ptr<VulkanMesh> Shapes::Sphere::Generate(const RenderScope& Scope, GeometryDescriptor* Geometry) const
 	{
 		std::vector<MeshVertex> vertices;
 		std::vector<uint32_t> indices;
@@ -317,15 +317,15 @@ namespace GR
 			for (uint32_t i = 0; i < indices.size(); i++)
 				indices16.push_back(static_cast<uint16_t>(indices[i]));
 
-			return std::make_unique<VulkanMesh>(Scope, vertices.data(), vertices.size(), indices16.data(), indices16.size());
+			return std::make_shared<VulkanMesh>(Scope, vertices.data(), vertices.size(), indices16.data(), indices16.size());
 		}
 		else
 		{
-			return std::make_unique<VulkanMesh>(Scope, vertices.data(), vertices.size(), indices.data(), indices.size());
+			return std::make_shared<VulkanMesh>(Scope, vertices.data(), vertices.size(), indices.data(), indices.size());
 		}
 	}
 
-	std::unique_ptr<VulkanMesh> Shapes::Mesh::Generate(const RenderScope& Scope, GeometryDescriptor* Geometry) const
+	std::shared_ptr<VulkanMesh> Shapes::Mesh::Generate(const RenderScope& Scope, GeometryDescriptor* Geometry) const
 	{
 		std::unordered_map<MeshVertex, uint32_t> uniqueVertices{};
 		std::vector<uint32_t> indices;
@@ -392,15 +392,15 @@ namespace GR
 			for (uint32_t i = 0; i < indices.size(); i++)
 				indices16.push_back(static_cast<uint16_t>(indices[i]));
 
-			return std::make_unique<VulkanMesh>(Scope, vertices.data(), vertices.size(), indices16.data(), indices16.size());
+			return std::make_shared<VulkanMesh>(Scope, vertices.data(), vertices.size(), indices16.data(), indices16.size());
 		}
 		else
 		{
-			return std::make_unique<VulkanMesh>(Scope, vertices.data(), vertices.size(), indices.data(), indices.size());
+			return std::make_shared<VulkanMesh>(Scope, vertices.data(), vertices.size(), indices.data(), indices.size());
 		}
 	}
 
-	std::unique_ptr<VulkanMesh> Shapes::GeoClipmap::Generate(const RenderScope& Scope, GeometryDescriptor* Geometry) const
+	std::shared_ptr<VulkanMesh> Shapes::GeoClipmap::Generate(const RenderScope& Scope, GeometryDescriptor* Geometry) const
 	{
 		const uint32_t m = (glm::max(m_VerPerRing, 7u) + 1) / 4;
 		std::vector<uint32_t> indices{};
@@ -596,6 +596,6 @@ namespace GR
 		indices.shrink_to_fit();
 		vertices.shrink_to_fit();
 
-		return std::make_unique<VulkanMesh>(Scope, vertices.data(), vertices.size(), indices.data(), indices.size());
+		return std::make_shared<VulkanMesh>(Scope, vertices.data(), vertices.size(), indices.data(), indices.size());
 	}
 };

@@ -6,8 +6,16 @@
 #include "Vulkan/scope.hpp"
 #include "Engine/structs.hpp"
 
-struct VulkanImage
+class VulkanImage
 {
+	struct _internalObj
+	{
+		VkImage image = VK_NULL_HANDLE;
+		VmaAllocation memory = VK_NULL_HANDLE;
+		VkDescriptorImageInfo descriptorInfo = {};
+	};
+
+public:
 	VulkanImage(const RenderScope& Scope);
 
 	VulkanImage(const RenderScope& Scope, VkImageCreateInfo imgInfo, VmaAllocationCreateInfo allocCreateInfo);
@@ -18,11 +26,10 @@ struct VulkanImage
 
 	VulkanImage(VulkanImage&& other) noexcept
 		: Scope(other.Scope), image(std::move(other.image)), memory(std::move(other.memory)),
-		allocInfo(std::move(other.allocInfo)), descriptorInfo(std::move(other.descriptorInfo))
+		descriptorInfo(std::move(other.descriptorInfo))
 	{
 		other.image = VK_NULL_HANDLE;
 		other.memory = VK_NULL_HANDLE;
-		other.allocInfo = {};
 		other.descriptorInfo = {};
 	}
 
@@ -30,18 +37,14 @@ struct VulkanImage
 		Scope = other.Scope;
 		image = std::move(other.image);
 		memory = std::move(other.memory);
-		allocInfo = std::move(other.allocInfo);
 		descriptorInfo = std::move(other.descriptorInfo);
 
 		other.image = VK_NULL_HANDLE;
 		other.memory = VK_NULL_HANDLE;
-		other.allocInfo = {};
 		other.descriptorInfo = {};
 	}
 
 	~VulkanImage();
-
-	VulkanImage& CreateImage(VkImageCreateInfo imgInfo, VmaAllocationCreateInfo allocCreateInfo);
 
 	VulkanImage& TransitionLayout(VkImageLayout newLayout, VkQueueFlagBits Queue = VK_QUEUE_GRAPHICS_BIT);
 
@@ -83,17 +86,14 @@ struct VulkanImage
 
 	const uint32_t GetArrayLayers() const { return subRange.layerCount; };
 
-	const VkImageLayout GetImageLayout() const { return descriptorInfo.imageLayout; };
-
 	const VkImageCreateFlags GetImageFlags() const { return flags; };
 
 	VkImageCreateFlags flags;
 private:
 	VkImage image = VK_NULL_HANDLE;
 	VmaAllocation memory = VK_NULL_HANDLE;
-
-	VmaAllocationInfo allocInfo = {};
 	VkDescriptorImageInfo descriptorInfo = {};
+
 	VkImageSubresourceRange subRange = {};
 	VkExtent3D imageSize = {};
 	VkFormat imageFormat = {};

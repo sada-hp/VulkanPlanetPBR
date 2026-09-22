@@ -22,7 +22,7 @@ void DescriptorSet::BindSet(uint32_t set, VkCommandBuffer cmd, const GraphicsPip
 	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.GetLayout(), set, 1, &descriptorSet, 0, VK_NULL_HANDLE);
 }
 
-DescriptorSetDescriptor& DescriptorSetDescriptor::AddUniformBuffer(uint32_t binding, VkShaderStageFlags stages, const Buffer& buffer)
+DescriptorSetDescriptor& DescriptorSetDescriptor::AddUniformBuffer(uint32_t binding, VkShaderStageFlags stages, const GVkBuffer& buffer)
 {
 	VkDescriptorSetLayoutBinding DSBinding{};
 	DSBinding.binding = binding;
@@ -43,7 +43,7 @@ DescriptorSetDescriptor& DescriptorSetDescriptor::AddUniformBuffer(uint32_t bind
 	return *this;
 }
 
-DescriptorSetDescriptor& DescriptorSetDescriptor::AddStorageBuffer(uint32_t binding, VkShaderStageFlags stages, const Buffer& buffer)
+DescriptorSetDescriptor& DescriptorSetDescriptor::AddStorageBuffer(uint32_t binding, VkShaderStageFlags stages, const GVkBuffer& buffer)
 {
 	VkDescriptorSetLayoutBinding DSBinding{};
 	DSBinding.binding = binding;

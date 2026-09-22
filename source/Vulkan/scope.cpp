@@ -46,6 +46,11 @@ RenderScope& RenderScope::CreateSwapchain(const VkSurfaceKHR& surface)
 	return *this;
 }
 
+void RenderScope::IncrementFlightIndex()
+{
+	m_ResourceIndex = (m_ResourceIndex + 1) % m_FramesInFlight;
+}
+
 RenderScope& RenderScope::CreateDefaultRenderPass()
 {
 	VkRenderPassCreateInfo createInfo{};

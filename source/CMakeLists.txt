@@ -16,7 +16,7 @@ add_library(source SHARED ${ROOT_SOURCES} ${VULKAN_SOURCES} ${IMGUI_SOURCES})
 
 
 add_compile_definitions(DEBUG=$<CONFIG:Debug>)
-target_compile_definitions(source PRIVATE GRAPI)
+target_compile_definitions(source PUBLIC DLL_API)
 set_target_properties(source PROPERTIES  RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_SOURCE_DIR}/../bin)
 set_target_properties(source PROPERTIES  RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_SOURCE_DIR}/../bin)
 target_precompile_headers(source PRIVATE pch.hpp)

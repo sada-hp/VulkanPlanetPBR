@@ -85,6 +85,8 @@ public:
 	inline const VkFormat GetDepthFormat() const { return VK_FORMAT_D32_SFLOAT; };
 
 	inline const uint32_t& GetMaxFramesInFlight() const { return m_FramesInFlight; };
+	inline const uint32_t& GetResourceIndex() const { return m_ResourceIndex; }
+	void IncrementFlightIndex();
 
 	const VkSampler GetSampler(ESamplerType Type, uint32_t Mips) const;
 
@@ -99,6 +101,7 @@ private:
 	mutable std::vector<std::tuple<ESamplerType, uint32_t, VkSampler>> m_Samplers;
 
 	uint32_t m_FramesInFlight = 1u;
+	uint32_t m_ResourceIndex = 0;
 
 	VkDevice m_LogicalDevice = VK_NULL_HANDLE;
 	VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;

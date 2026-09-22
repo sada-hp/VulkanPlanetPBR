@@ -9,8 +9,8 @@ struct GraphicsObject
 private:
 	friend class VulkanBase;
 
-	std::unique_ptr<GraphicsPipeline> pipeline;
-	std::unique_ptr<DescriptorSet> descriptorSet;
+	std::shared_ptr<GraphicsPipeline> pipeline;
+	std::shared_ptr<DescriptorSet> descriptorSet;
 };
 
 #pragma pack(push, 1)
@@ -49,6 +49,6 @@ struct PBRObject : public GraphicsObject
 private:
 	friend class VulkanBase;
 
-	std::unique_ptr<VulkanMesh> mesh;
+	std::shared_ptr<VulkanMesh> mesh;
 	bool dirty = false;
 };

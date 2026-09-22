@@ -5,6 +5,8 @@
 #include <vector>
 #include <array>
 
+#include "core.hpp"
+
 struct VulkanSynchronization
 {
 	VkFence Fence;

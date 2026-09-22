@@ -49,25 +49,11 @@ VulkanImage::VulkanImage(const RenderScope& InScope)
 VulkanImage::VulkanImage(const RenderScope& InScope, VkImageCreateInfo imgInfo, VmaAllocationCreateInfo allocCreateInfo)
 	: Scope(&InScope)
 {
-	CreateImage(imgInfo, allocCreateInfo);
-}
-
-VulkanImage::~VulkanImage()
-{
-	if (image != VK_NULL_HANDLE)
-		vmaDestroyImage(Scope->GetAllocator(), image, memory);
-}
-
-VulkanImage& VulkanImage::CreateImage(VkImageCreateInfo imgInfo, VmaAllocationCreateInfo allocCreateInfo)
-{
-	if (image != VK_NULL_HANDLE)
-		vmaDestroyImage(Scope->GetAllocator(), image, memory);
-
 	VkImageLayout layout = imgInfo.initialLayout;
 	imgInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	descriptorInfo.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-	VkBool32 res = vmaCreateImage(Scope->GetAllocator(), &imgInfo, &allocCreateInfo, &image, &memory, &allocInfo) == VK_SUCCESS;
+	VkBool32 res = vmaCreateImage(Scope->GetAllocator(), &imgInfo, &allocCreateInfo, &image, &memory, nullptr) == VK_SUCCESS;
 	subRange.baseArrayLayer = 0;
 	subRange.baseMipLevel = 0;
 	subRange.layerCount = imgInfo.arrayLayers;
@@ -75,7 +61,7 @@ VulkanImage& VulkanImage::CreateImage(VkImageCreateInfo imgInfo, VmaAllocationCr
 	imageSize = imgInfo.extent;
 	imageFormat = imgInfo.format;
 	imageType = imgInfo.imageType;
-	subRange.aspectMask = (imageFormat == VK_FORMAT_D16_UNORM 
+	subRange.aspectMask = (imageFormat == VK_FORMAT_D16_UNORM
 		|| imageFormat == VK_FORMAT_D32_SFLOAT
 		|| imageFormat == VK_FORMAT_D24_UNORM_S8_UINT
 		|| imageFormat == VK_FORMAT_D32_SFLOAT_S8_UINT
@@ -86,8 +72,12 @@ VulkanImage& VulkanImage::CreateImage(VkImageCreateInfo imgInfo, VmaAllocationCr
 
 	if (layout != VK_IMAGE_LAYOUT_UNDEFINED)
 		TransitionLayout(layout);
+}
 
-	return *this;
+VulkanImage::~VulkanImage()
+{
+	if (image != VK_NULL_HANDLE)
+		vmaDestroyImage(Scope->GetAllocator(), image, memory);
 }
 
 VulkanImage& VulkanImage::TransitionLayout(VkImageLayout newLayout, VkQueueFlagBits Queue)
