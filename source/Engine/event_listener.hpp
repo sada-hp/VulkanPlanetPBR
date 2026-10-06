@@ -3,63 +3,80 @@
 #include "glm/glm.hpp"
 #include "Engine/enums.hpp"
 
-namespace GR
+namespace GEvents
 {
-	namespace Events
+	struct MousePosition { double x; double y; double delta_x; double delta_y; };
+
+	struct ScrollDelta { double x; double y; };
+
+	struct MousePress { GEnums::EMouse key; GEnums::EAction action; };
+
+	struct KeyPress { GEnums::EKey key; GEnums::EAction action; };
+}
+
+class GEventListener
+{
+	friend class GWindow;
+
+private:
+	std::vector<std::function<void(GEvents::MousePosition, void*)>> m_mouseMoveEvents = {};
+	std::vector<std::function<void(GEvents::MousePress, void*)>> m_mousePressEvents = {};
+	std::vector<std::function<void(GEvents::ScrollDelta, void*)>> m_scrollEvents = {};
+	std::vector<std::function<void(GEvents::KeyPress, void*)>> m_keyPressEvents = {};
+	void* m_UserPointer = nullptr;
+
+protected:
+	void Register(GEvents::KeyPress) const;
+	void Register(GEvents::MousePress) const;
+	void Register(GEvents::ScrollDelta) const;
+	void Register(GEvents::MousePosition) const;
+
+public:
+	GEventListener()
 	{
-		struct MousePosition { double x; double y; };
-
-		struct ScrollDelta { double x; double y; };
-
-		struct MousePress { GR::Enums::EMouse key; GR::Enums::EAction action; };
-
-		struct KeyPress { GR::Enums::EKey key; GR::Enums::EAction action; };
 	}
 
+	~GEventListener() = default;
+	void SetUserPointer(void* pointer);
 
-	class EventListener
+public:
+	template<typename T, typename Callback = void(T::*)(GEvents::KeyPress, void*)>
+	inline void SubscribeKeyPressEvent(T* object, Callback func)
 	{
-	private:
-		friend class Window;
+		std::function lambda = [object, func](GEvents::KeyPress e, void* p) {
+			std::invoke(func, object, e, p);
+		};
 
-		std::vector<void(*)(Events::KeyPress, void*)> m_KeyPressEvents;
-		std::vector<void(*)(Events::MousePress, void*)> m_MousePressEvents;
-		std::vector<void(*)(Events::MousePosition, void*)> m_MouseMoveEvents;
-		std::vector<void(*)(Events::ScrollDelta, void*)> m_ScrollEvents;
+		m_keyPressEvents.push_back(lambda);
+	}
 
-		void* m_UserPointer = nullptr;
+	template<typename T, typename Callback = void(T::*)(GEvents::MousePress, void*)>
+	inline void SubscribeMousePressEvent(T* object, Callback func)
+	{
+		std::function lambda = [object, func](GEvents::MousePress e, void* p) {
+			std::invoke(func, object, e, p);
+		};
 
-	public:
-		EventListener()
-		{
-			m_KeyPressEvents.reserve(10);
-			m_MousePressEvents.reserve(10);
-			m_MouseMoveEvents.reserve(10);
-			m_ScrollEvents.reserve(10);
-		}
+		m_mousePressEvents.push_back(lambda);
+	}
 
-		~EventListener() = default;
+	template<typename T, typename Callback = void(T::*)(GEvents::ScrollDelta, void*)>
+	inline void SubscribeScrollEvent(T* object, Callback func)
+	{
+		std::function lambda = [object, func](GEvents::ScrollDelta e, void* p) {
+			std::invoke(func, object, e, p);
+		};
 
-		GRAPI void SetUserPointer(void* pointer);
+		m_scrollEvents.push_back(lambda);
+	}
 
-		// !@brief Subscribe to keyboard key press events
-		GRAPI void Subscribe(void(*key_press_callback_func)(Events::KeyPress, void*));
+	template<typename T, typename Callback = void(T::*)(GEvents::MousePosition, void*)>
+	inline void SubscribeMouseMoveEvent(T* object, Callback func)
+	{
+		std::function lambda = [object, func](GEvents::MousePosition e, void* p) {
+			std::invoke(func, object, e, p);
+		};
 
-		// !@brief Subscribe to mouse button press events
-		GRAPI void Subscribe(void(*mouse_press_callback_func)(Events::MousePress, void*));
-
-		// !@brief Subscribe to mouse pointer move events
-		GRAPI void Subscribe(void(*mouse_move_callback_func)(Events::MousePosition, void*));
-
-		// !@brief Subscribe to mouse scroll events
-		GRAPI void Subscribe(void(*scroll_callback_fun)(Events::ScrollDelta, void*));
-
-		GRAPI void Register(Events::KeyPress) const;
-
-		GRAPI void Register(Events::MousePress) const;
-
-		GRAPI void Register(Events::MousePosition) const;
-
-		GRAPI void Register(Events::ScrollDelta) const;
-	};
+		m_mouseMoveEvents.push_back(lambda);
+	}
 };

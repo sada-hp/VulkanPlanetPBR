@@ -9,6 +9,4 @@
 #include <map>
 #include <future>
 #include <any>
-#include <glm/glm.hpp>
-#include <glm/gtx/quaternion.hpp>
 #include <queue>
