@@ -8,14 +8,23 @@ ShaderCodeDefinition(GShaders::MeshVS)
 	} Transform;
 
 	layout(location = 0) in vec3 vertPosition;
-	layout(location = 1) in vec3 vertNormal;
-	layout(location = 2) in vec3 vertTangent;
-	layout(location = 3) in vec2 vertUV;
+	layout(location = 1) in uint vertSubmesh;
+	layout(location = 2) in vec3 vertNormal;
+	layout(location = 3) in vec3 vertTangent;
+	layout(location = 4) in vec2 vertUV;
+
+	layout(location = 0) out vec2 fragUV;
+	layout(location = 1) out flat uint fragSubmesh;
+	layout(location = 2) out vec3 fragNormal;
 
 	void main()
 	{
 		dvec4 WorldPositionFP64 = Transform.Matrix * dvec4(vertPosition, 1.0);
 		gl_Position = vec4(UBO.view_proj * WorldPositionFP64);
+
+		fragSubmesh = vertSubmesh;
+		fragNormal = vertNormal;
+		fragUV = vertUV;
 	}
 );
 
@@ -23,8 +32,33 @@ ShaderCodeDefinition(GShaders::MeshPS)
 (
 	layout(location = 0) out vec4 Color;
 
+	layout(location = 0) in vec2 UV;
+	layout(location = 1) in flat uint Submesh;
+	layout(location = 2) in vec3 Normal;
+
+	layout(set = 1, binding = 0) uniform sampler2D Albedo[];
+
 	void main()
 	{
-		Color = vec4(1.0, 0.0, 0.0, 1.0);
+		float Shade = mix(0.25, 1.0, max(dot(normalize(Normal.xyz), UBO.sun_dir.xyz), 0.0));
+		
+		Color = texture(Albedo[Submesh], UV);
+		Color.rgb *= Shade;
+	}
+);
+
+ShaderCodeDefinition(GShaders::MeshDefaultPS)
+(
+	layout(location = 0) out vec4 Color;
+
+	layout(location = 0) in vec2 UV;
+	layout(location = 1) in flat uint Submesh;
+	layout(location = 2) in vec3 Normal;
+
+	void main()
+	{
+		vec2 Checker = fract(UV) * 2.0 - 1.0;
+		Color.rb = mix(vec2(0.0), vec2(0.5), float(sign(Checker.x) == sign(Checker.y)));
+		Color.ga = vec2(0.0, 1.0);
 	}
 );

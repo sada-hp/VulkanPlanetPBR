@@ -70,7 +70,8 @@ public:
 	template<typename Type = TOffset>
 	glm::mat<4, 4, Type> GetMatrix() const
 	{
-		glm::mat<4, 4, Type> m = glm::mat<4, 4, Type>(GetOrientation());
-		return glm::translate(m, GetPosition());
+		glm::vec<3, Type> pos = planet_base + local_offset.GetPosition();
+		glm::mat<4, 4, Type> m = glm::mat<4, 4, Type>(GEllipsoid::EulerFromCartesian(pos));
+		return glm::translate(m, pos);
 	}
 };

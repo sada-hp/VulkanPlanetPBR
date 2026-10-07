@@ -23,11 +23,6 @@ ShaderCodeDefinition(GShaderUtils::UtilsCommon)
         return sm * inv;
     }
 
-    float remap(float orig, float old_min, float old_max, float new_min, float new_max)
-    {
-        return new_min + (((orig - old_min) / (old_max - old_min)) * (new_max - new_min));
-    }
-
     float saturate(float x)
     {
         return clamp(x, 0.0, 1.0);
@@ -66,5 +61,22 @@ ShaderCodeDefinition(GShaderUtils::UtilsCommon)
     vec3 divide_w(vec4 v)
     {
         return v.xyz / v.w;
+    }
+
+    vec3 sphere_intersection(vec3 ro, vec3 rd, vec3 so, float radius)
+    {
+        float radius2 = radius * radius;
+
+        vec3 L = ro - so;
+        float a = dot(rd, rd);
+        float b = 2.0 * dot(rd, L);
+        float c = dot(L, L) - radius2;
+        float discr = b * b - 4.0 * a * c;
+
+        vec2 t = vec2(0.0);
+        t.x = mix(0xffffffff, -b - sqrt(discr) / 2, float(discr >= 0.0));
+        t.y = mix(0xffffffff, -b + sqrt(discr) / 2, float(discr >= 0.0));
+
+        return ro + rd * min(t.x, t.y);
     }
 );

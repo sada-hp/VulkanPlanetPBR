@@ -60,6 +60,7 @@ public:
 
 	void UpdateBuffer(std::shared_ptr<GVkBufferView> View, char* Data);
 	void CopyBuffer(std::shared_ptr<GVkBufferView> BufferSrc, std::shared_ptr<GVkBufferView> BufferDst);
+	void CopyBuffer(std::shared_ptr<GVkBufferView> BufferSrc, std::shared_ptr<GVkImageView> ImageDst);
 
 	void ClearImage(std::shared_ptr<GVkImageView> View, VkClearColorValue ClearValue);
 

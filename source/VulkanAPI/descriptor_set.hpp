@@ -30,7 +30,6 @@ private:
 
 private:
 	GVkDescriptorSet(std::shared_ptr<RenderScope> Scope);
-	void _addResource(std::shared_ptr<IVkObj> resource);
 
 public:
 	virtual ~GVkDescriptorSet();
@@ -41,18 +40,34 @@ public:
 
 class DescriptorSetDescriptor
 {
+	struct _buffer_write
+	{
+		VkWriteDescriptorSet writeInfo;
+		std::shared_ptr<GVkBufferView> view;
+	};
+
+	struct _image_write
+	{
+		VkImageLayout layout;
+		VkWriteDescriptorSet writeInfo;
+		std::shared_ptr<GVkImageView> imageView;
+		std::shared_ptr<GVkSampler> imageSampler;
+	};
+
 private:
-	std::vector<std::tuple<VkDescriptorSetLayoutBinding, std::shared_ptr<GVkImageView>, VkImageLayout, std::shared_ptr<GVkSampler>>> imageResources = {};
-	std::vector<std::tuple<VkDescriptorSetLayoutBinding, std::shared_ptr<GVkBufferView>>> bufferResources = {};
+	std::vector<VkDescriptorSetLayoutBinding> descriptorBindings = {};
+	std::vector<std::shared_ptr<IVkObj>> acquiredObjects = {};
+	std::vector<_buffer_write> bufferWrites = {};
+	std::vector<_image_write> imageWrites = {};
 
 	std::shared_ptr<RenderScope> Scope = VK_NULL_HANDLE;
-	uint32_t bindingCount = 0;
 	bool bIsInFlight = false;
 
 public:
 	DescriptorSetDescriptor& AddUniformBuffer(VkShaderStageFlags stages, std::shared_ptr<GVkBufferView> view);
 	DescriptorSetDescriptor& AddStorageBuffer(VkShaderStageFlags stages, std::shared_ptr<GVkBufferView> view);
 
+	DescriptorSetDescriptor& AddImageSampler(VkShaderStageFlags stages, const std::vector<std::pair<std::shared_ptr<GVkImageView>, std::shared_ptr<GVkSampler>>>& image_samplers);
 	DescriptorSetDescriptor& AddImageSampler(VkShaderStageFlags stages, std::shared_ptr<GVkImageView> view, std::shared_ptr<GVkSampler> sampler);
 	DescriptorSetDescriptor& AddStorageImage(VkShaderStageFlags stages, std::shared_ptr<GVkImageView> view);
 

@@ -116,6 +116,28 @@ void GVkCommandBuffer::CopyBuffer(std::shared_ptr<GVkBufferView> BufferSrc, std:
 	object.acquired_resources.emplace_back(BufferDst);
 }
 
+void GVkCommandBuffer::CopyBuffer(std::shared_ptr<GVkBufferView> BufferSrc, std::shared_ptr<GVkImageView> ImageDst)
+{
+	auto& object = _updateRecording();
+
+	std::vector<VkBufferImageCopy> copies(ImageDst->GetLevelCount());
+	for (uint32_t level = ImageDst->BaseLevel(); level < ImageDst->BaseLevel() + ImageDst->GetLevelCount(); level++)
+	{
+		copies[level].imageExtent = ImageDst->GetRoot()->GetExtent();
+		copies[level].imageSubresource.aspectMask = ImageDst->GetSubresource().aspectMask;
+		copies[level].imageSubresource.baseArrayLayer = ImageDst->BaseLayer();
+		copies[level].imageSubresource.layerCount = ImageDst->GetLayerCount();
+		copies[level].imageSubresource.mipLevel = level;
+	}
+
+	BindBarrier<GVkTransferSrcBarrier>(BufferSrc);
+	BindBarrier<GVkTransferDstBarrier>(ImageDst);
+	vkCmdCopyBufferToImage(object.cmd, BufferSrc->GetBuffer(), ImageDst->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, copies.size(), copies.data());
+
+	object.acquired_resources.emplace_back(BufferSrc);
+	object.acquired_resources.emplace_back(ImageDst);
+}
+
 void GVkCommandBuffer::ClearImage(std::shared_ptr<GVkImageView> Image, VkClearColorValue ClearValue)
 {
 	auto& object = _updateRecording();

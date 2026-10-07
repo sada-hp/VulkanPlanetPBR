@@ -52,16 +52,18 @@ bool RenderScope::_createLogicalDevice(VkPhysicalDevice physicalDevice, const st
 	VkPhysicalDeviceFeatures2 availableFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, &availableFeaturesVk12 };
 	vkGetPhysicalDeviceFeatures2(physicalDevice, &availableFeatures);
 
-	if (availableFeatures.features.imageCubeArray != VK_TRUE ||
-		availableFeatures.features.fullDrawIndexUint32 != VK_TRUE ||
-		availableFeatures.features.shaderFloat64 != VK_TRUE ||
-		availableFeatures.features.samplerAnisotropy != VK_TRUE ||
-		availableFeatures.features.independentBlend != VK_TRUE ||
-		availableFeatures.features.fillModeNonSolid != VK_TRUE ||
-		availableFeatures.features.geometryShader != VK_TRUE ||
-		availableFeatures.features.multiDrawIndirect != VK_TRUE ||
-		availableFeaturesVk12.drawIndirectCount != VK_TRUE ||
-		availableSynchronization2Features.synchronization2 != VK_TRUE)
+	if (availableFeatures.features.imageCubeArray                       != VK_TRUE ||
+		availableFeatures.features.fullDrawIndexUint32                  != VK_TRUE ||
+		availableFeatures.features.shaderFloat64                        != VK_TRUE ||
+		availableFeatures.features.samplerAnisotropy                    != VK_TRUE ||
+		availableFeatures.features.independentBlend                     != VK_TRUE ||
+		availableFeatures.features.fillModeNonSolid                     != VK_TRUE ||
+		availableFeatures.features.geometryShader                       != VK_TRUE ||
+		availableFeatures.features.multiDrawIndirect                    != VK_TRUE ||
+		availableFeaturesVk12.drawIndirectCount                         != VK_TRUE ||
+		availableFeaturesVk12.runtimeDescriptorArray                    != VK_TRUE ||
+		availableFeaturesVk12.shaderSampledImageArrayNonUniformIndexing != VK_TRUE ||
+		availableSynchronization2Features.synchronization2              != VK_TRUE)
 	{
 		return false;
 	}
@@ -70,6 +72,8 @@ bool RenderScope::_createLogicalDevice(VkPhysicalDevice physicalDevice, const st
 	synchronization2Features.synchronization2 = VK_TRUE;
 
 	VkPhysicalDeviceVulkan12Features featureVk12{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES, &synchronization2Features };
+	featureVk12.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+	featureVk12.runtimeDescriptorArray = VK_TRUE;
 	featureVk12.drawIndirectCount = VK_TRUE;
 
 	VkPhysicalDeviceFeatures deviceFeatures{};

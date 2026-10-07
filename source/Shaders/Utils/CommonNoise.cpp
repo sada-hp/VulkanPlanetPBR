@@ -1,14 +1,51 @@
 #include "Shaders/ShaderLibrary.hpp"
 
+ShaderCodeDefinition(GShaderNoise::NoiseGS)
+(
+    layout(triangles) in;
+    layout(triangle_strip, max_vertices = 3) out;
+
+    layout(location = 0) in vec3 inUVW[];
+    layout(location = 0) out vec3 outUVW;
+
+    layout(push_constant) uniform constants
+    {
+        uint layers;
+        uint frequency_worley;
+        uint frequency_perlin;
+        uint seed;
+    }
+    Settings;
+
+    void main()
+    {
+        for (int vertex = 0; vertex < 3; vertex++)
+        {
+            gl_Position = gl_in[vertex].gl_Position;
+            gl_Layer = int(inUVW[vertex].z);
+            outUVW = inUVW[vertex];
+            outUVW.z /= Settings.layers;
+            EmitVertex();
+        }
+
+        EndPrimitive();
+    }
+);
+
 ShaderCodeDefinition(GShaderUtils::NoiseCommon)
 (
     const uint UI0 = 1597334673U;
     const uint UI1 = 3812015801U;
     const uvec2 UI2 = uvec2(UI0, UI1);
-    const uvec3 UI3 = uvec3(UI0, UI1, 2798796415U)
-    const float UIF = (1.0 / float(0xffffffffU))
+    const uvec3 UI3 = uvec3(UI0, UI1, 2798796415U);
+    const float UIF = (1.0 / float(0xffffffffU));
 
     uint NOISE_SEED = 2798796415U;
+
+    float remap(float orig, float old_min, float old_max, float new_min, float new_max)
+    {
+        return new_min + (((orig - old_min) / (old_max - old_min)) * (new_max - new_min));
+    }
 
     float noise(float p)
     {

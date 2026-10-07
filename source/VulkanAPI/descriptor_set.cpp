@@ -12,12 +12,6 @@ GVkDescriptorSet::~GVkDescriptorSet()
 	vkDestroyDescriptorPool(Scope->GetDevice(), m_descriptorSetPool, VK_NULL_HANDLE);
 }
 
-void GVkDescriptorSet::_addResource(std::shared_ptr<IVkObj> resource)
-{
-	if (resource)
-		m_sharedResources.push_back(resource);
-}
-
 const VkDescriptorSet& GVkDescriptorSet::GetDescriptorSet() const
 {
 	auto& object = _activeObj();
@@ -28,13 +22,20 @@ DescriptorSetDescriptor& DescriptorSetDescriptor::AddUniformBuffer(VkShaderStage
 {
 	VkDescriptorSetLayoutBinding bindingInfo{};
 	bindingInfo.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	bindingInfo.binding = bindingCount;
+	bindingInfo.binding = descriptorBindings.size();
 	bindingInfo.stageFlags = stages;
 	bindingInfo.descriptorCount = 1;
+	descriptorBindings.push_back(bindingInfo);
 
-	bufferResources.emplace_back(bindingInfo, view);
+	VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+	write.descriptorCount = 1;
+	write.dstArrayElement = 0;
+	write.dstBinding = bindingInfo.binding;
+	write.descriptorType = bindingInfo.descriptorType;
+	bufferWrites.emplace_back(write, view);
+
 	bIsInFlight |= view->GetRoot()->IsInFlight();
-	bindingCount++;
+	acquiredObjects.push_back(view);
 
 	return *this;
 }
@@ -43,13 +44,20 @@ DescriptorSetDescriptor& DescriptorSetDescriptor::AddStorageBuffer(VkShaderStage
 {
 	VkDescriptorSetLayoutBinding bindingInfo{};
 	bindingInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	bindingInfo.binding = bindingCount;
+	bindingInfo.binding = descriptorBindings.size();
 	bindingInfo.stageFlags = stages;
 	bindingInfo.descriptorCount = 1;
+	descriptorBindings.push_back(bindingInfo);
 
-	bufferResources.emplace_back(bindingInfo, view);
+	VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+	write.descriptorCount = 1;
+	write.dstArrayElement = 0;
+	write.dstBinding = bindingInfo.binding;
+	write.descriptorType = bindingInfo.descriptorType;
+	bufferWrites.emplace_back(write, view);
+
 	bIsInFlight |= view->GetRoot()->IsInFlight();
-	bindingCount++;
+	acquiredObjects.push_back(view);
 
 	return *this;
 }
@@ -58,13 +66,49 @@ DescriptorSetDescriptor& DescriptorSetDescriptor::AddImageSampler(VkShaderStageF
 {
 	VkDescriptorSetLayoutBinding bindingInfo{};
 	bindingInfo.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	bindingInfo.binding = bindingCount;
+	bindingInfo.binding = descriptorBindings.size();
 	bindingInfo.stageFlags = stages;
 	bindingInfo.descriptorCount = 1;
+	descriptorBindings.push_back(bindingInfo);
 
-	imageResources.emplace_back(bindingInfo, view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, sampler);
+	VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+	write.descriptorCount = 1;
+	write.dstArrayElement = 0;
+	write.dstBinding = bindingInfo.binding;
+	write.descriptorType = bindingInfo.descriptorType;
+	imageWrites.emplace_back(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, write, view, sampler);
+
 	bIsInFlight |= view->GetRoot()->IsInFlight();
-	bindingCount++;
+	acquiredObjects.push_back(sampler);
+	acquiredObjects.push_back(view);
+
+	return *this;
+}
+
+DescriptorSetDescriptor& DescriptorSetDescriptor::AddImageSampler(VkShaderStageFlags stages, const std::vector<std::pair<std::shared_ptr<GVkImageView>, std::shared_ptr<GVkSampler>>>& image_samplers)
+{
+	VkDescriptorSetLayoutBinding bindingInfo{};
+	bindingInfo.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	bindingInfo.descriptorCount = image_samplers.size();
+	bindingInfo.binding = descriptorBindings.size();
+	bindingInfo.stageFlags = stages;
+	descriptorBindings.push_back(bindingInfo);
+
+	uint32_t arrIndex = 0;
+	for (auto& [view, sampler] : image_samplers)
+	{
+		VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+		write.descriptorCount = 1;
+		write.dstArrayElement = arrIndex;
+		write.dstBinding = bindingInfo.binding;
+		write.descriptorType = bindingInfo.descriptorType;
+		imageWrites.emplace_back(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, write, view, sampler);
+
+		bIsInFlight |= view->GetRoot()->IsInFlight();
+		acquiredObjects.push_back(sampler);
+		acquiredObjects.push_back(view);
+		arrIndex++;
+	}
 
 	return *this;
 }
@@ -73,13 +117,20 @@ DescriptorSetDescriptor& DescriptorSetDescriptor::AddStorageImage(VkShaderStageF
 {
 	VkDescriptorSetLayoutBinding bindingInfo{};
 	bindingInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-	bindingInfo.binding = bindingCount;
+	bindingInfo.binding = descriptorBindings.size();
 	bindingInfo.stageFlags = stages;
 	bindingInfo.descriptorCount = 1;
+	descriptorBindings.push_back(bindingInfo);
 
-	imageResources.emplace_back(bindingInfo, view, VK_IMAGE_LAYOUT_GENERAL, VK_NULL_HANDLE);
+	VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+	write.descriptorCount = 1;
+	write.dstArrayElement = 0;
+	write.dstBinding = bindingInfo.binding;
+	write.descriptorType = bindingInfo.descriptorType;
+	imageWrites.emplace_back(VK_IMAGE_LAYOUT_GENERAL, write, view, VK_NULL_HANDLE);
+
 	bIsInFlight |= view->GetRoot()->IsInFlight();
-	bindingCount++;
+	acquiredObjects.push_back(view);
 
 	return *this;
 }
@@ -88,13 +139,20 @@ DescriptorSetDescriptor& DescriptorSetDescriptor::AddSubpassAttachment(VkShaderS
 {
 	VkDescriptorSetLayoutBinding bindingInfo{};
 	bindingInfo.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-	bindingInfo.binding = bindingCount;
+	bindingInfo.binding = descriptorBindings.size();
 	bindingInfo.stageFlags = stages;
 	bindingInfo.descriptorCount = 1;
+	descriptorBindings.push_back(bindingInfo);
 
-	imageResources.emplace_back(bindingInfo, view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_NULL_HANDLE);
+	VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+	write.descriptorCount = 1;
+	write.dstArrayElement = 0;
+	write.dstBinding = bindingInfo.binding;
+	write.descriptorType = bindingInfo.descriptorType;
+	imageWrites.emplace_back(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, write, view, VK_NULL_HANDLE);
+
 	bIsInFlight |= view->GetRoot()->IsInFlight();
-	bindingCount++;
+	acquiredObjects.push_back(view);
 
 	return *this;
 }
@@ -102,29 +160,15 @@ DescriptorSetDescriptor& DescriptorSetDescriptor::AddSubpassAttachment(VkShaderS
 std::shared_ptr<GVkDescriptorSet> DescriptorSetDescriptor::Allocate(std::shared_ptr<RenderScope> Scope)
 {
 	std::shared_ptr<GVkDescriptorSet> descriptor = std::shared_ptr<GVkDescriptorSet>{ new GVkDescriptorSet(Scope) };
+	descriptor->m_sharedResources = acquiredObjects;
 
 	uint32_t FlightCount = bIsInFlight ? Scope->GetMaxFramesInFlight() : 1;
+
 	std::unordered_map<VkDescriptorType, uint32_t> descriptor_counts = {};
-	std::vector<VkDescriptorSetLayoutBinding> descriptor_bindings = {};
+	for (auto binding : descriptorBindings)
+		descriptor_counts[binding.descriptorType] += FlightCount * binding.descriptorCount;
+
 	std::vector<VkDescriptorPoolSize> pool_sizes = {};
-
-	for (auto& [binding, view, layout, sampler] : imageResources)
-	{
-		descriptor_counts[binding.descriptorType] += FlightCount * binding.descriptorCount;
-
-		descriptor_bindings.push_back(binding);
-		descriptor->_addResource(sampler);
-		descriptor->_addResource(view);
-	}
-
-	for (auto& [binding, view] : bufferResources)
-	{
-		descriptor_counts[binding.descriptorType] += FlightCount * binding.descriptorCount;
-
-		descriptor_bindings.push_back(binding);
-		descriptor->_addResource(view);
-	}
-
 	for (auto& [type, count] : descriptor_counts)
 		pool_sizes.emplace_back(type, count);
 
@@ -135,8 +179,8 @@ std::shared_ptr<GVkDescriptorSet> DescriptorSetDescriptor::Allocate(std::shared_
 	vkCreateDescriptorPool(Scope->GetDevice(), &poolCreateInfo, VK_NULL_HANDLE, &descriptor->m_descriptorSetPool);
 
 	VkDescriptorSetLayoutCreateInfo layoutCreateInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-	layoutCreateInfo.bindingCount = descriptor_bindings.size();
-	layoutCreateInfo.pBindings = descriptor_bindings.data();
+	layoutCreateInfo.bindingCount = descriptorBindings.size();
+	layoutCreateInfo.pBindings = descriptorBindings.data();
 	vkCreateDescriptorSetLayout(Scope->GetDevice(), &layoutCreateInfo, VK_NULL_HANDLE, &descriptor->m_descriptorSetLayout);
 
 	uint32_t index = 0;
@@ -154,27 +198,10 @@ std::shared_ptr<GVkDescriptorSet> DescriptorSetDescriptor::Allocate(std::shared_
 		std::vector<VkDescriptorBufferInfo> buffer_infos = {};
 		std::vector<VkDescriptorImageInfo> image_infos = {};
 
-		image_infos.reserve(imageResources.size());
-		buffer_infos.reserve(bufferResources.size());
+		buffer_infos.reserve(bufferWrites.size());
+		image_infos.reserve(imageWrites.size());
 
-		for (auto& [binding, view, layout, sampler] : imageResources)
-		{
-			VkDescriptorImageInfo descriptorInfo{};
-			descriptorInfo.imageLayout = layout;
-			descriptorInfo.imageView = view->At(index);
-			descriptorInfo.sampler = sampler ? sampler->GetSampler() : VK_NULL_HANDLE;
-			image_infos.push_back(descriptorInfo);
-
-			VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-			write.descriptorCount = binding.descriptorCount;
-			write.descriptorType = binding.descriptorType;
-			write.pImageInfo = &image_infos.back();
-			write.dstBinding = binding.binding;
-			write.dstSet = object.set;
-			descriptor_writes.push_back(write);
-		}
-
-		for (auto& [binding, view] : bufferResources)
+		for (auto& [write, view] : bufferWrites)
 		{
 			VkDescriptorBufferInfo descriptorInfo{};
 			descriptorInfo.buffer = view->At(index);
@@ -182,11 +209,21 @@ std::shared_ptr<GVkDescriptorSet> DescriptorSetDescriptor::Allocate(std::shared_
 			descriptorInfo.range = view->GetSize();
 			buffer_infos.push_back(descriptorInfo);
 
-			VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-			write.descriptorCount = binding.descriptorCount;
-			write.descriptorType = binding.descriptorType;
-			write.pBufferInfo = &buffer_infos.back();
 			write.dstSet = object.set;
+			write.pBufferInfo = &buffer_infos.back();
+			descriptor_writes.push_back(write);
+		}
+
+		for (auto& [layout, write, view, sampler] : imageWrites)
+		{
+			VkDescriptorImageInfo descriptorInfo{};
+			descriptorInfo.imageView = view->At(index);
+			descriptorInfo.imageLayout = layout;
+			descriptorInfo.sampler = sampler->GetSampler();
+			image_infos.push_back(descriptorInfo);
+
+			write.dstSet = object.set;
+			write.pImageInfo = &image_infos.back();
 			descriptor_writes.push_back(write);
 		}
 

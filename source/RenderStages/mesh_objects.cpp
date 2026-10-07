@@ -10,7 +10,7 @@ GMeshStage::GMeshStage(std::shared_ptr<RenderScope> Scope, const GVkSharedResour
 	Framebuffer = std::make_shared<GVkFramebuffer>(Scope, RenderPass, std::vector{ GVkImage::ToView(Resources.ColorBuffer) });
 
 	DescriptorSetDescriptor DSDesc{};
-	DSDesc.AddUniformBuffer(VK_SHADER_STAGE_VERTEX_BIT, GVkBuffer::ToView(Resources.UBO));
+	DSDesc.AddUniformBuffer(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, GVkBuffer::ToView(Resources.UBO));
 	DescriptorSet = DSDesc.Allocate(Scope);
 }
 
@@ -33,6 +33,9 @@ void GMeshStage::Execute(const GCamera& Camera, const IWorld& World)
 
 		glm::dmat4 WorldMatrix = object.WorldMatrix.GetMatrix<double>();
 		CommandBuffer->PushConstants(0, WorldMatrix);
+
+		if (object.Material->GetDescriptorSet())
+			CommandBuffer->BindDescriptorSet(1, object.Material->GetDescriptorSet());
 
 		if (object.Mesh->IndexCount() > 0)
 		{

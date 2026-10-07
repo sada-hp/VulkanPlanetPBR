@@ -1,9 +1,14 @@
 #include "clouds.hpp"
+#include "Factories/VkImageFactory.hpp"
 #include "Factories/VkSamplerFactory.hpp"
 
 GCloudsStage::GCloudsStage(std::shared_ptr<RenderScope> Scope, const GVkSharedResources& Resources)
 	: IRenderStage(Scope, VK_QUEUE_GRAPHICS_BIT)
 {
+	Images.PerlinWorley = _generate_noise(GShaderNoise::PerlinWorleyPS, VkExtent3D{ 128, 128, 128 }, 4, 4);
+	Images.HighFrequency = _generate_noise(GShaderNoise::WorleyPS, VkExtent3D{ 64, 64, 64 }, 16, 16);
+	Images.LowFrequency = _generate_noise(GShaderNoise::WorleyPS, VkExtent3D{ 64, 64, 64 }, 4, 4);
+
 	RenderPassDescriptor RPDesc{};
 	RPDesc.AddAttachmentLoadOp(Resources.ColorBuffer->GetFormat(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 	RenderPass = RPDesc.Construct(Scope);
@@ -15,11 +20,82 @@ GCloudsStage::GCloudsStage(std::shared_ptr<RenderScope> Scope, const GVkSharedRe
 	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Resources.IrradianceLUT), GVkSamplerFactory::LinearSamplerClamp(Scope));
 	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Resources.ScatteringLUT), GVkSamplerFactory::LinearSamplerClamp(Scope));
 	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Resources.TransmittanceLUT), GVkSamplerFactory::LinearSamplerClamp(Scope));
+	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Images.LowFrequency), GVkSamplerFactory::LinearSamplerClamp(Scope));
+	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Images.HighFrequency), GVkSamplerFactory::LinearSamplerClamp(Scope));
+	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Images.PerlinWorley), GVkSamplerFactory::LinearSamplerClamp(Scope));
 	DescriptorSet = DSDesc.Allocate(Scope);
+
+	GraphicsPipelineDescriptor PSODesc{};
+	PSODesc.SetRenderPass(RenderPass);
+	PSODesc.AddDescriptorLayout(DescriptorSet->GetLayout());
+	PSODesc.VS.AppendCode(GShaders::FullscreenVS);
+	PSODesc.PS.AppendCode(GShaderUtils::NoiseCommon)
+		.AppendCode(GShaderUtils::LightingCommon)
+		.AppendCode(GShaderUtils::UtilsCommon)
+		.AppendCode(GShaderUtils::UBOCommon)
+		.AppendCode(GShaders::CloudsPS);
+
+	//PSODesc.AttachmentBlendState(0).blendEnable = VK_TRUE;
+	//PSODesc.AttachmentBlendState(0).colorBlendOp = VK_BLEND_OP_ADD;
+	//PSODesc.AttachmentBlendState(0).srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+	//PSODesc.AttachmentBlendState(0).dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+	Pipeline = PSODesc.Construct(Scope);
 }
 
 GCloudsStage::~GCloudsStage()
 {
+
+}
+
+std::shared_ptr<GVkImage> GCloudsStage::_generate_noise(const std::string& shader, VkExtent3D extents, uint32_t freq, uint32_t octaves)
+{
+	struct Settings
+	{
+		uint32_t lyr;
+		uint32_t freq;
+		uint32_t octaves;
+		uint32_t seed;
+	};
+
+	std::shared_ptr<GVkImage> Image = GVkImageFactory::Image(Scope, VK_FORMAT_R16G16B16A16_SFLOAT, extents, EImageFlags::Sampler | EImageFlags::RenderTarget);
+
+	RenderPassDescriptor RPDesc{};
+	RPDesc.AddAttachmentDontCareOp(Image->GetFormat());
+	std::shared_ptr<GVkRenderPass> _renderPass = RPDesc.Construct(Scope);
+	std::shared_ptr<GVkFramebuffer> _framebuffer = std::make_shared<GVkFramebuffer>(Scope, _renderPass, std::vector{ GVkImage::ToView(Image, extents.depth > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D) });
+	
+	GraphicsPipelineDescriptor PSODesc{};
+
+	PSODesc.PS.AppendCode(GShaderUtils::NoiseCommon);
+
+	if (extents.depth > 1)
+	{
+		PSODesc.VS.AppendCode(GShaders::FullscreenLayeredVS);
+		PSODesc.GS.AppendCode(GShaderNoise::NoiseGS);
+		PSODesc.PS.AddDefine("_3D_NOISE");
+
+		PSODesc.AddPushConstants<Settings>(VK_SHADER_STAGE_GEOMETRY_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+	}
+	else
+	{
+		PSODesc.VS.AppendCode(GShaders::FullscreenVS);
+		PSODesc.AddPushConstants<Settings>(VK_SHADER_STAGE_FRAGMENT_BIT);
+	}
+
+	PSODesc.PS.AppendCode(shader);
+	PSODesc.SetRenderPass(_renderPass);
+	std::shared_ptr<GVkPipeline> _pipeline = PSODesc.Construct(Scope);
+
+	std::shared_ptr<GVkCommandBuffer> _commandBuffer = std::make_shared<GVkCommandBuffer>(Scope, VK_QUEUE_GRAPHICS_BIT);
+	Settings _settings{ extents.depth, freq, octaves, 42u };
+
+	_commandBuffer->BeginRenderPass(_renderPass, _framebuffer);
+	_commandBuffer->BindPipeline(_pipeline);
+	_commandBuffer->PushConstants(0, _settings);
+	_commandBuffer->Draw(3, extents.depth);
+	_commandBuffer->Submit();
+
+	return Image;
 }
 
 void GCloudsStage::Execute(const GCamera& Camera, const IWorld& World)

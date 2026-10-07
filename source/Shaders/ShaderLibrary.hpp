@@ -32,6 +32,7 @@ class GShaderNoise
 public:
 	static ShaderCodeType PerlinWorleyPS;
 	static ShaderCodeType WorleyPS;
+	static ShaderCodeType NoiseGS;
 };
 
 class GShaders
@@ -46,4 +47,5 @@ public:
 	// Mesh
 	static ShaderCodeType MeshVS;
 	static ShaderCodeType MeshPS;
+	static ShaderCodeType MeshDefaultPS;
 };

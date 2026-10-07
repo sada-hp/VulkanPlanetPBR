@@ -5,6 +5,24 @@
 
 struct MeshVertex
 {
+public:
+	glm::vec3 position = glm::vec3(0.0);
+	uint32_t  submesh  = glm::uint(0u);
+	glm::vec3 normal   = glm::vec3(0.0);
+	glm::vec3 tangent  = glm::vec3(0.0);
+	glm::vec2 uv       = glm::vec2(0.0);
+
+public:
+	bool operator==(const MeshVertex& other) const
+	{
+		return position == other.position
+			&& normal == other.normal
+			&& tangent == other.tangent
+			&& uv == other.uv
+			&& submesh == other.submesh;
+	}
+
+public:
 	static const std::vector<VkVertexInputBindingDescription> getBindingDescriptions()
 	{
 		VkVertexInputBindingDescription bindingDescription{};
@@ -17,7 +35,7 @@ struct MeshVertex
 
 	static const std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions()
 	{
-		std::vector<VkVertexInputAttributeDescription> attributeDescriptions(4);
+		std::vector<VkVertexInputAttributeDescription> attributeDescriptions(5);
 
 		attributeDescriptions[0].binding = 0;
 		attributeDescriptions[0].location = 0;
@@ -26,40 +44,41 @@ struct MeshVertex
 
 		attributeDescriptions[1].binding = 0;
 		attributeDescriptions[1].location = 1;
-		attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-		attributeDescriptions[1].offset = offsetof(MeshVertex, normal);
+		attributeDescriptions[1].format = VK_FORMAT_R32_UINT;
+		attributeDescriptions[1].offset = offsetof(MeshVertex, submesh);
 
 		attributeDescriptions[2].binding = 0;
 		attributeDescriptions[2].location = 2;
 		attributeDescriptions[2].format = VK_FORMAT_R32G32B32_SFLOAT;
-		attributeDescriptions[2].offset = offsetof(MeshVertex, tangent);
+		attributeDescriptions[2].offset = offsetof(MeshVertex, normal);
 
 		attributeDescriptions[3].binding = 0;
 		attributeDescriptions[3].location = 3;
-		attributeDescriptions[3].format = VK_FORMAT_R32G32_SFLOAT;
-		attributeDescriptions[3].offset = offsetof(MeshVertex, uv);
+		attributeDescriptions[3].format = VK_FORMAT_R32G32B32_SFLOAT;
+		attributeDescriptions[3].offset = offsetof(MeshVertex, tangent);
+
+		attributeDescriptions[4].binding = 0;
+		attributeDescriptions[4].location = 4;
+		attributeDescriptions[4].format = VK_FORMAT_R32G32_SFLOAT;
+		attributeDescriptions[4].offset = offsetof(MeshVertex, uv);
 
 		return attributeDescriptions;
 	}
-
-	bool operator==(const MeshVertex& other) const
-	{
-		return position == other.position
-			&& normal == other.normal
-			&& tangent == other.tangent
-			&& uv == other.uv
-			&& submesh == other.submesh;
-	}
-
-	uint32_t submesh = 0;
-	glm::vec3 position;
-	glm::vec3 normal;
-	glm::vec3 tangent;
-	glm::vec2 uv;
 };
 
 struct TerrainVertex
 {
+public:
+	glm::vec4 position;
+	glm::vec4 uv;
+
+public:
+	bool operator==(const TerrainVertex& other) const
+	{
+		return position == other.position && uv == other.uv;
+	}
+
+public:
 	static const VkVertexInputBindingDescription getBindingDescription()
 	{
 		VkVertexInputBindingDescription bindingDescription{};
@@ -86,14 +105,6 @@ struct TerrainVertex
 
 		return attributeDescriptions;
 	}
-
-	bool operator==(const TerrainVertex& other) const
-	{
-		return position == other.position && uv == other.uv;
-	}
-
-	glm::vec4 position;
-	glm::vec4 uv;
 };
 
 template<>

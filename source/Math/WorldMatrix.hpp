@@ -19,7 +19,7 @@ public:
 	template<typename Type = TRotation>
 	glm::mat<3, 3, Type> GetOrientation() const
 	{
-		return glm::toMat3(glm::qua<TRotation>(angles));
+		return glm::toMat3(glm::qua<TRotation>(glm::vec<3, Type>(glm::radians(angles.x), glm::radians(angles.y), glm::radians(angles.z))));
 	}
 
 	template<typename Type = TRotation>

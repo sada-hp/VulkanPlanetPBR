@@ -123,7 +123,8 @@ VkShaderModule GVkResourceCache::Get(const IShader& Shader)
 			default: kind = shaderc_shader_kind::shaderc_glsl_vertex_shader; break;
 		};
 
-		std::string Code = "#version 460 \n" + Shader.GetCode();
+		std::string common_defines = "#version 460 \n #extension GL_EXT_nonuniform_qualifier : require \n";
+		std::string Code = common_defines + Shader.GetCode();
 		options.SetOptimizationLevel(shaderc_optimization_level_size);
 		shaderc::PreprocessedSourceCompilationResult PreprocessedGLSL = compiler.PreprocessGlsl(Code.c_str(), kind, "shader", options);
 

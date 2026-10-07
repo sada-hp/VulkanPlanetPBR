@@ -30,7 +30,7 @@ GVkImage::GVkImage(std::shared_ptr<RenderScope> InScope, VkFormat Format, VkExte
 
 	if (CheckFlag(Flags, EImageFlags::AllocateMipMaps))
 	{
-		imageCreateInfo.mipLevels = std::max(std::log2(Extents.width), std::log2(Extents.height));
+		imageCreateInfo.mipLevels = std::max(std::max(std::log2(Extents.width), std::log2(Extents.height)), 1.0);
 	}
 	else
 	{
@@ -97,16 +97,6 @@ GVkImage::~GVkImage()
 {
 	for (auto& object : m_flightResources)
 		vmaDestroyImage(Scope->GetAllocator(), object.image, object.memory);
-}
-
-size_t GVkImage::GetBytesSize() const
-{
-	auto& object = _activeObj();
-
-	VmaAllocationInfo allocInfo{};
-	vmaGetAllocationInfo(Scope->GetAllocator(), object.memory, &allocInfo);
-
-	return allocInfo.size;
 }
 
 const VkImage& GVkImage::GetImage() const

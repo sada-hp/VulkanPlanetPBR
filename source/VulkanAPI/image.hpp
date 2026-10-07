@@ -66,7 +66,6 @@ public:
 	virtual ~GVkImage();
 
 public:
-	size_t GetBytesSize() const;
 	const VkImage& GetImage() const;
 	
 	bool IsInFlight() const { return m_flightResources.size() != 1; }

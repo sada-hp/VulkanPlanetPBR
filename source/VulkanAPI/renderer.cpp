@@ -7,6 +7,7 @@
 #include "RenderStages/Precompute/atmosphereLUT.hpp"
 #include "RenderStages/mesh_objects.hpp"
 #include "RenderStages/atmosphere.hpp"
+#include "RenderStages/clouds.hpp"
 
 struct _UniformBuffer
 {
@@ -32,6 +33,7 @@ GVulkanBase::GVulkanBase(GLFWwindow* window)
 
 	// render stages
 	m_RenderStages.emplace_back(new GAtmosphereStage(m_Scope, m_Resources));
+	// m_RenderStages.emplace_back(new GCloudsStage(m_Scope, m_Resources));
 	m_RenderStages.emplace_back(new GMeshStage(m_Scope, m_Resources));
 }
 

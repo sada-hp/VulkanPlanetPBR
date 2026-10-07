@@ -51,12 +51,12 @@ public:
 	void AddPushConstants(VkShaderStageFlags Stages)
 	{
 		VkPushConstantRange range{};
+		range.stageFlags = Stages;
 		range.size = sizeof(T);
 
-		if (!pushConstants.empty())
-			range.offset = pushConstants.back().offset + pushConstants.back().size;
-
-		range.stageFlags = Stages;
+		range.offset = 0;
+		for (auto& push : pushConstants)
+			range.offset = std::max(range.offset, push.offset + push.size);
 
 		pushConstants.push_back(range);
 	}
