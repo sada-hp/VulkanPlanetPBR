@@ -286,6 +286,10 @@ ShaderCodeDefinition(GShaderUtils::LightingCommon)
 
         inscatter.w *= smoothstep(0.00, 0.02, EdotL);
         Atmosphere.S = (max(inscatter.rgb * PhaseR, 0.0) + max(GetMie(inscatter) * PhaseM, 0.0));
+
+        Atmosphere.L *= MaxLightIntensity / PI;
+        Atmosphere.E *= MaxLightIntensity / PI;
+        Atmosphere.S *= MaxLightIntensity;
     }
 
     vec3 SkyScattering(sampler2D TransmittanceLUT, sampler3D InscatteringLUT, vec3 Eye, vec3 View, vec3 Sun)

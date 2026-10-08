@@ -11,7 +11,8 @@ GVkResourceCache::GVkResourceCache(VkDevice device)
 	: shader_cache_dir(std::filesystem::current_path().string() + "\\cache\\shaders\\")
 	, m_vkDevice(device)
 {
-	_restore();
+	if (!std::filesystem::exists(shader_cache_dir))
+		std::filesystem::create_directories(shader_cache_dir);
 }
 
 GVkResourceCache::~GVkResourceCache()
@@ -19,42 +20,38 @@ GVkResourceCache::~GVkResourceCache()
 	_flush();
 }
 
-void GVkResourceCache::_restore()
+bool GVkResourceCache::_restore_shader(size_t hash)
 {
-	if (std::filesystem::exists(shader_cache_dir))
+	std::filesystem::path path = shader_cache_dir + std::to_string(hash);
+
+	if (std::filesystem::exists(path))
 	{
-		for (auto file : std::filesystem::directory_iterator(shader_cache_dir))
+		std::ifstream inFile(path.string(), std::ios::binary);
+		if (inFile.is_open())
 		{
-			size_t hash = std::stoull(file.path().filename());
-			std::string path = file.path().string();
+			size_t bufferSize = std::filesystem::file_size(path);
+			std::vector<char> buffer(bufferSize);
 
-			std::ifstream inFile(path, std::ios::binary);
-			if (inFile.is_open())
+			if (inFile.read(buffer.data(), buffer.size()))
 			{
-				size_t bufferSize = file.file_size();
-				std::vector<char> buffer(bufferSize);
+				std::vector<uint32_t> code = std::vector(reinterpret_cast<uint32_t*>(buffer.data()), reinterpret_cast<uint32_t*>(buffer.data() + buffer.size()));
 
-				if (inFile.read(buffer.data(), buffer.size()))
+				if (code.back() == magic)
 				{
-					std::vector<uint32_t> code = std::vector(reinterpret_cast<uint32_t*>(buffer.data()), reinterpret_cast<uint32_t*>(buffer.data() + buffer.size()));
+					code.erase(std::prev(code.end()));
 
-					if (code.back() == magic)
-					{
-						code.erase(std::prev(code.end()));
-
-						m_shaderCache[hash].code = std::move(code);
-						_compile(hash, m_shaderCache[hash], false);
-					}
+					m_shaderCache[hash].code = std::move(code);
+					_compile(hash, m_shaderCache[hash], false);
 				}
-
-				inFile.close();
 			}
+
+			inFile.close();
 		}
+
+		return m_shaderCache[hash].module != VK_NULL_HANDLE;
 	}
-	else
-	{
-		std::filesystem::create_directories(shader_cache_dir);
-	}
+
+	return false;
 }
 
 void GVkResourceCache::_compile(size_t hash, GVkShaderCache& cache, bool bWrite)
@@ -107,7 +104,7 @@ VkShaderModule GVkResourceCache::Get(const IShader& Shader)
 {
 	size_t Hash = GHash::Hash(Shader.HashString());
 
-	if (!m_shaderCache.contains(Hash) || m_shaderCache[Hash].module == VK_NULL_HANDLE)
+	if (!m_shaderCache.contains(Hash) && !_restore_shader(Hash))
 	{
 		shaderc_shader_kind kind;
 		shaderc::Compiler compiler;
@@ -115,12 +112,12 @@ VkShaderModule GVkResourceCache::Get(const IShader& Shader)
 
 		switch (Shader.GetStage())
 		{
-			case VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT: kind = shaderc_shader_kind::shaderc_glsl_default_tess_control_shader; break;
-			case VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT: kind = shaderc_shader_kind::shaderc_glsl_tess_evaluation_shader; break;
-			case VK_SHADER_STAGE_GEOMETRY_BIT: kind = shaderc_shader_kind::shaderc_geometry_shader; break;
-			case VK_SHADER_STAGE_FRAGMENT_BIT: kind = shaderc_shader_kind::shaderc_fragment_shader; break;
-			case VK_SHADER_STAGE_COMPUTE_BIT: kind = shaderc_shader_kind::shaderc_compute_shader; break;
-			default: kind = shaderc_shader_kind::shaderc_glsl_vertex_shader; break;
+		case VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT: kind = shaderc_shader_kind::shaderc_glsl_default_tess_control_shader; break;
+		case VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT: kind = shaderc_shader_kind::shaderc_glsl_tess_evaluation_shader; break;
+		case VK_SHADER_STAGE_GEOMETRY_BIT: kind = shaderc_shader_kind::shaderc_geometry_shader; break;
+		case VK_SHADER_STAGE_FRAGMENT_BIT: kind = shaderc_shader_kind::shaderc_fragment_shader; break;
+		case VK_SHADER_STAGE_COMPUTE_BIT: kind = shaderc_shader_kind::shaderc_compute_shader; break;
+		default: kind = shaderc_shader_kind::shaderc_glsl_vertex_shader; break;
 		};
 
 		std::string common_defines = "#version 460 \n #extension GL_EXT_nonuniform_qualifier : require \n";

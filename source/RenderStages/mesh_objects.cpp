@@ -1,16 +1,21 @@
 #include "mesh_objects.hpp"
+#include "Factories/VkSamplerFactory.hpp"
 
 GMeshStage::GMeshStage(std::shared_ptr<RenderScope> Scope, const GVkSharedResources& Resources)
 	: IRenderStage(Scope, VK_QUEUE_GRAPHICS_BIT)
 {
 	RenderPassDescriptor RPDesc{};
-	RPDesc.AddAttachmentLoadOp(RenderScope::GetColorFormat(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+	RPDesc.AddAttachmentLoadOp(RenderScope::GetColorFormat(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	RPDesc.AddAttachmentClearOp(RenderScope::GetDepthFormat(), VkClearValue{ .depthStencil = { 0.f, 0 } });
 	RenderPass = RPDesc.Construct(Scope);
 
-	Framebuffer = std::make_shared<GVkFramebuffer>(Scope, RenderPass, std::vector{ GVkImage::ToView(Resources.ColorBuffer) });
+	Framebuffer = std::make_shared<GVkFramebuffer>(Scope, RenderPass, std::vector{ GVkImage::ToView(Resources.ColorBuffer), GVkImage::ToView(Resources.DepthBuffer) });
 
 	DescriptorSetDescriptor DSDesc{};
 	DSDesc.AddUniformBuffer(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, GVkBuffer::ToView(Resources.UBO));
+	DSDesc.AddImageSampler(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Resources.IrradianceLUT), GVkSamplerFactory::LinearSamplerRepeat(Scope));
+	DSDesc.AddImageSampler(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Resources.ScatteringLUT), GVkSamplerFactory::LinearSamplerRepeat(Scope));
+	DSDesc.AddImageSampler(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Resources.TransmittanceLUT), GVkSamplerFactory::LinearSamplerRepeat(Scope));
 	DescriptorSet = DSDesc.Allocate(Scope);
 }
 

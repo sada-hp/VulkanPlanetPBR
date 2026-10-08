@@ -8,10 +8,14 @@ GMeshMaterial::GMeshMaterial(std::shared_ptr<RenderScope> Scope, const MaterialD
 {
 	RenderPassDescriptor RPDesc{};
 	RPDesc.AddAttachmentLoadOp(RenderScope::GetColorFormat(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+	RPDesc.AddAttachmentClearOp(RenderScope::GetDepthFormat(), VkClearValue{});
 	std::shared_ptr<GVkRenderPass> RenderPass = RPDesc.Construct(Scope);
 
 	DescriptorLayoutDescriptor DSLDesc{};
 	DSLDesc.AddUniformBuffer(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+	DSLDesc.AddImageSampler(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+	DSLDesc.AddImageSampler(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+	DSLDesc.AddImageSampler(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 	std::shared_ptr<GVkDescriptorSetLayout> Layout = DSLDesc.Construct(Scope);
 
 	GraphicsPipelineDescriptor PSODesc{};
@@ -25,9 +29,11 @@ GMeshMaterial::GMeshMaterial(std::shared_ptr<RenderScope> Scope, const MaterialD
 		.SetPolygonMode(Descriptor.PolygonMode);
 
 	PSODesc.VS.AppendCode(GShaderUtils::UBOCommon)
+		.AppendCode(GShaderUtils::LightingCommon)
 		.AppendCode(GShaders::MeshVS);
 
-	PSODesc.PS.AppendCode(GShaderUtils::UBOCommon);
+	PSODesc.PS.AppendCode(GShaderUtils::UBOCommon)
+		.AppendCode(GShaderUtils::LightingCommon);
 
 	if (Descriptor.SubmeshTextures.empty())
 	{

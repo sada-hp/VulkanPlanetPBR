@@ -5,7 +5,7 @@ GAtmosphereStage::GAtmosphereStage(std::shared_ptr<RenderScope> Scope, const GVk
 	: IRenderStage(Scope, VK_QUEUE_GRAPHICS_BIT)
 {
 	RenderPassDescriptor RPDesc{};
-	RPDesc.AddAttachmentDontCareOp(Resources.ColorBuffer->GetFormat(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+	RPDesc.AddAttachmentDontCareOp(Resources.ColorBuffer->GetFormat());
 	RenderPass = RPDesc.Construct(Scope);
 
 	Framebuffer = std::make_shared<GVkFramebuffer>(Scope, RenderPass, std::vector{ Resources.ColorBuffer });

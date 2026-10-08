@@ -152,6 +152,7 @@ uint32_t RenderPassDescriptor::AddAttachmentLoadOp(VkFormat Format, VkImageLayou
 	attachmentDescription.samples = Samples;
 	attachmentDescription.format = Format;
 	m_attachmentDescriptions.push_back(attachmentDescription);
+	m_clearValues.push_back(VkClearValue{});
 
 	return m_attachmentDescriptions.size() - 1;
 }
@@ -168,6 +169,8 @@ uint32_t RenderPassDescriptor::AddAttachmentDontCareOp(VkFormat Format, VkImageL
 	attachmentDescription.samples = Samples;
 	attachmentDescription.format = Format;
 	m_attachmentDescriptions.push_back(attachmentDescription);
+
+	m_clearValues.push_back(VkClearValue{});
 
 	return m_attachmentDescriptions.size() - 1;
 }
@@ -199,7 +202,7 @@ RenderPassDescriptor& RenderPassDescriptor::AddSubpass(const GVkSubpassDescripti
 	for (auto& inputIndex : SubpassDescription.inputAttachmentsIndices)
 		Subpass.inputReferences.emplace_back(inputIndex, VK_IMAGE_LAYOUT_GENERAL);
 
-	Subpass.depthReference = VkAttachmentReference{ SubpassDescription.depthAttachmentIndex, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL };
+	Subpass.depthReference = VkAttachmentReference{ SubpassDescription.depthAttachmentIndex, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
 	Subpass.Index = m_subpasses.size();
 
 	m_subpasses.push_back(Subpass);

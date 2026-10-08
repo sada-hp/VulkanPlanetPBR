@@ -41,7 +41,7 @@ private:
 	void _flush();
 
 	void _compile(size_t, GVkShaderCache&, bool bWrite = true);
-	void _restore();
+	bool _restore_shader(size_t hash);
 
 public:
 	GVkResourceCache(VkDevice);

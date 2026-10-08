@@ -48,4 +48,6 @@ public:
 	static ShaderCodeType MeshVS;
 	static ShaderCodeType MeshPS;
 	static ShaderCodeType MeshDefaultPS;
+	// Post process
+	static ShaderCodeType TonemapPS;
 };

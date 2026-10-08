@@ -2,6 +2,8 @@
 
 ShaderCodeDefinition(GShaderUtils::UtilsCommon)
 (
+    const float Invalid = 0xffffffff;
+
     float smootherstep(float e0, float e1, float x)
     {
         x = clamp((x - e0) / (e1 - e0), 0.0, 1.0);
@@ -63,7 +65,7 @@ ShaderCodeDefinition(GShaderUtils::UtilsCommon)
         return v.xyz / v.w;
     }
 
-    vec3 sphere_intersection(vec3 ro, vec3 rd, vec3 so, float radius)
+    float sphere_intersection(vec3 ro, vec3 rd, vec3 so, float radius)
     {
         float radius2 = radius * radius;
 
@@ -71,12 +73,13 @@ ShaderCodeDefinition(GShaderUtils::UtilsCommon)
         float a = dot(rd, rd);
         float b = 2.0 * dot(rd, L);
         float c = dot(L, L) - radius2;
+
         float discr = b * b - 4.0 * a * c;
 
-        vec2 t = vec2(0.0);
-        t.x = mix(0xffffffff, -b - sqrt(discr) / 2, float(discr >= 0.0));
-        t.y = mix(0xffffffff, -b + sqrt(discr) / 2, float(discr >= 0.0));
+        vec2 t;
+        t.x = mix(max((-b - sqrt(discr)) / 2, 0.0), 0.0, float(discr < 0.0));
+        t.y = mix(max((-b + sqrt(discr)) / 2, 0.0), 0.0, float(discr < 0.0));
 
-        return ro + rd * min(t.x, t.y);
+        return mix(t.x, t.y, float(t.y > t.x));
     }
 );

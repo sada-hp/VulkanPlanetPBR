@@ -5,24 +5,22 @@
 GCloudsStage::GCloudsStage(std::shared_ptr<RenderScope> Scope, const GVkSharedResources& Resources)
 	: IRenderStage(Scope, VK_QUEUE_GRAPHICS_BIT)
 {
-	Images.PerlinWorley = _generate_noise(GShaderNoise::PerlinWorleyPS, VkExtent3D{ 128, 128, 128 }, 4, 4);
-	Images.HighFrequency = _generate_noise(GShaderNoise::WorleyPS, VkExtent3D{ 64, 64, 64 }, 16, 16);
-	Images.LowFrequency = _generate_noise(GShaderNoise::WorleyPS, VkExtent3D{ 64, 64, 64 }, 4, 4);
+	Images.PerlinWorley = _generate_noise(GShaderNoise::PerlinWorleyPS, VK_FORMAT_R32_SFLOAT, VkExtent3D{ 128, 128, 128 }, 6, 16);
+	Images.HighFrequency = _generate_noise(GShaderNoise::WorleyPS, VK_FORMAT_R32G32B32A32_SFLOAT, VkExtent3D{ 64, 64, 64 }, 4, 4);
 
 	RenderPassDescriptor RPDesc{};
-	RPDesc.AddAttachmentLoadOp(Resources.ColorBuffer->GetFormat(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+	RPDesc.AddAttachmentLoadOp(Resources.ColorBuffer->GetFormat(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	RenderPass = RPDesc.Construct(Scope);
 
 	Framebuffer = std::make_shared<GVkFramebuffer>(Scope, RenderPass, std::vector{ Resources.ColorBuffer });
 
 	DescriptorSetDescriptor DSDesc{};
 	DSDesc.AddUniformBuffer(VK_SHADER_STAGE_FRAGMENT_BIT, GVkBuffer::ToView(Resources.UBO));
-	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Resources.IrradianceLUT), GVkSamplerFactory::LinearSamplerClamp(Scope));
-	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Resources.ScatteringLUT), GVkSamplerFactory::LinearSamplerClamp(Scope));
-	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Resources.TransmittanceLUT), GVkSamplerFactory::LinearSamplerClamp(Scope));
-	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Images.LowFrequency), GVkSamplerFactory::LinearSamplerClamp(Scope));
-	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Images.HighFrequency), GVkSamplerFactory::LinearSamplerClamp(Scope));
-	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Images.PerlinWorley), GVkSamplerFactory::LinearSamplerClamp(Scope));
+	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Resources.IrradianceLUT), GVkSamplerFactory::LinearSamplerRepeat(Scope));
+	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Resources.ScatteringLUT), GVkSamplerFactory::LinearSamplerRepeat(Scope));
+	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Resources.TransmittanceLUT), GVkSamplerFactory::LinearSamplerRepeat(Scope));
+	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Images.PerlinWorley), GVkSamplerFactory::LinearSamplerRepeat(Scope));
+	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Images.HighFrequency), GVkSamplerFactory::LinearSamplerRepeat(Scope));
 	DescriptorSet = DSDesc.Allocate(Scope);
 
 	GraphicsPipelineDescriptor PSODesc{};
@@ -35,10 +33,10 @@ GCloudsStage::GCloudsStage(std::shared_ptr<RenderScope> Scope, const GVkSharedRe
 		.AppendCode(GShaderUtils::UBOCommon)
 		.AppendCode(GShaders::CloudsPS);
 
-	//PSODesc.AttachmentBlendState(0).blendEnable = VK_TRUE;
-	//PSODesc.AttachmentBlendState(0).colorBlendOp = VK_BLEND_OP_ADD;
-	//PSODesc.AttachmentBlendState(0).srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-	//PSODesc.AttachmentBlendState(0).dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+	PSODesc.AttachmentBlendState(0).blendEnable = VK_TRUE;
+	PSODesc.AttachmentBlendState(0).colorBlendOp = VK_BLEND_OP_ADD;
+	PSODesc.AttachmentBlendState(0).srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+	PSODesc.AttachmentBlendState(0).dstColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
 	Pipeline = PSODesc.Construct(Scope);
 }
 
@@ -47,7 +45,7 @@ GCloudsStage::~GCloudsStage()
 
 }
 
-std::shared_ptr<GVkImage> GCloudsStage::_generate_noise(const std::string& shader, VkExtent3D extents, uint32_t freq, uint32_t octaves)
+std::shared_ptr<GVkImage> GCloudsStage::_generate_noise(const std::string& shader, VkFormat Format, VkExtent3D extents, uint32_t freq, uint32_t octaves)
 {
 	struct Settings
 	{
@@ -57,10 +55,10 @@ std::shared_ptr<GVkImage> GCloudsStage::_generate_noise(const std::string& shade
 		uint32_t seed;
 	};
 
-	std::shared_ptr<GVkImage> Image = GVkImageFactory::Image(Scope, VK_FORMAT_R16G16B16A16_SFLOAT, extents, EImageFlags::Sampler | EImageFlags::RenderTarget);
+	std::shared_ptr<GVkImage> Image = GVkImageFactory::Image(Scope, Format, extents, EImageFlags::Sampler | EImageFlags::RenderTarget);
 
 	RenderPassDescriptor RPDesc{};
-	RPDesc.AddAttachmentDontCareOp(Image->GetFormat());
+	RPDesc.AddAttachmentDontCareOp(Format);
 	std::shared_ptr<GVkRenderPass> _renderPass = RPDesc.Construct(Scope);
 	std::shared_ptr<GVkFramebuffer> _framebuffer = std::make_shared<GVkFramebuffer>(Scope, _renderPass, std::vector{ GVkImage::ToView(Image, extents.depth > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D) });
 	

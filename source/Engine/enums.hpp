@@ -18,6 +18,7 @@ namespace GEnums
 
 	enum class EKey
 	{
+		Space = GLFW_KEY_SPACE,
 		Key_0 = GLFW_KEY_0,
 		Key_1 = GLFW_KEY_1,
 		Key_2 = GLFW_KEY_2,
