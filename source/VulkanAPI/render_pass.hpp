@@ -71,7 +71,7 @@ private:
 public:
 	uint32_t AddAttachmentLoadOp(VkFormat Format, VkImageLayout InitialLayout, VkImageLayout FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VkSampleCountFlagBits Samples = VK_SAMPLE_COUNT_1_BIT);
 	uint32_t AddAttachmentDontCareOp(VkFormat Format, VkImageLayout FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VkSampleCountFlagBits Samples = VK_SAMPLE_COUNT_1_BIT);
-	uint32_t AddAttachmentClearOp(VkFormat Format, VkClearValue ClearValue, VkImageLayout FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VkSampleCountFlagBits Samples = VK_SAMPLE_COUNT_1_BIT);
+	uint32_t AddAttachmentClearOp(VkFormat Format, VkClearValue ClearValue = {}, VkImageLayout FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VkSampleCountFlagBits Samples = VK_SAMPLE_COUNT_1_BIT);
 	
 	RenderPassDescriptor& AddSubpass(const GVkSubpassDescription& Subpass);
 

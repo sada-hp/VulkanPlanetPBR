@@ -53,7 +53,7 @@ ShaderCodeDefinition(GShaders::MeshPS)
 		Color.rgb *= Shade;
 
 		SAtmosphere Atmosphere;
-		AerialPerspective(TransmittanceLUT, IrradianceLUT, InscatteringLUT, UBO.eye_pos.xyz, WorldPosition, UBO.sun_dir.xyz, Atmosphere);
+		GetAtmosphere(TransmittanceLUT, IrradianceLUT, InscatteringLUT, UBO.eye_pos.xyz, WorldPosition, UBO.sun_dir.xyz, Atmosphere);
 		Color.rgb = Atmosphere.L * Color.rgb + Atmosphere.S;
 	}
 );
@@ -83,7 +83,7 @@ ShaderCodeDefinition(GShaders::MeshDefaultPS)
 		Color.rgb *= Shade;
 
 		SAtmosphere Atmosphere;
-		AerialPerspective(TransmittanceLUT, IrradianceLUT, InscatteringLUT, UBO.eye_pos.xyz, WorldPosition, UBO.sun_dir.xyz, Atmosphere);
+		GetAtmosphere(TransmittanceLUT, IrradianceLUT, InscatteringLUT, UBO.eye_pos.xyz, WorldPosition, UBO.sun_dir.xyz, Atmosphere);
 		Color.rgb = Atmosphere.L * Color.rgb + Atmosphere.S;
 	}
 );

@@ -9,5 +9,7 @@ ShaderCodeDefinition(GShaderUtils::UBOCommon)
 
 		vec4 sun_dir;
 		vec4 eye_pos;
+
+		float time;
 	} UBO;
 );

@@ -5,8 +5,8 @@
 GCloudsStage::GCloudsStage(std::shared_ptr<RenderScope> Scope, const GVkSharedResources& Resources)
 	: IRenderStage(Scope, VK_QUEUE_GRAPHICS_BIT)
 {
-	Images.PerlinWorley = _generate_noise(GShaderNoise::PerlinWorleyPS, VK_FORMAT_R32_SFLOAT, VkExtent3D{ 128, 128, 128 }, 6, 16);
-	Images.HighFrequency = _generate_noise(GShaderNoise::WorleyPS, VK_FORMAT_R32G32B32A32_SFLOAT, VkExtent3D{ 64, 64, 64 }, 4, 4);
+	Images.PerlinWorley = _generate_noise(GShaderNoise::PerlinWorleyPS, VK_FORMAT_R32_SFLOAT, VkExtent3D{ 128, 128, 128 }, 4, 16);
+	Images.HighFrequency = _generate_noise(GShaderNoise::WorleyPS, VK_FORMAT_R32G32B32A32_SFLOAT, VkExtent3D{ 64, 64, 64 }, 8, 2);
 
 	RenderPassDescriptor RPDesc{};
 	RPDesc.AddAttachmentLoadOp(Resources.ColorBuffer->GetFormat(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);

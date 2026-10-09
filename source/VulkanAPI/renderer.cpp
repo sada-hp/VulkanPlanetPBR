@@ -17,6 +17,8 @@ struct _UniformBuffer
 
 	glm::vec4 sun_dir;
 	glm::vec4 eye_pos;
+
+	float Time;
 };
 
 GVulkanBase::GVulkanBase(GLFWwindow* window)
@@ -36,7 +38,7 @@ GVulkanBase::GVulkanBase(GLFWwindow* window)
 
 	// render stages
 	m_RenderStages.emplace_back(new GAtmosphereStage(m_Scope, m_Resources));
-	// m_RenderStages.emplace_back(new GCloudsStage(m_Scope, m_Resources));
+	m_RenderStages.emplace_back(new GCloudsStage(m_Scope, m_Resources));
 	m_RenderStages.emplace_back(new GMeshStage(m_Scope, m_Resources));
 	m_RenderStages.emplace_back(new GTonemapStage(m_Scope, m_Resources));
 }
@@ -63,6 +65,7 @@ bool GVulkanBase::Draw(const GCamera& Camera, const IWorld& World)
 		UBO.view_proj_inv = glm::inverse(view) * glm::inverse(proj);
 		UBO.sun_dir = glm::vec4(glm::normalize(glm::vec3(1.0, 1.0, 0.5)), 0.0);
 		UBO.eye_pos = glm::vec4(Camera.GetWorldMatrix().GetPosition(), 1.0);
+		UBO.Time = glfwGetTime();
 
 		memcpy(m_Resources.UBO->Map(), &UBO, sizeof(UBO));
 		m_Resources.UBO->UnMap();

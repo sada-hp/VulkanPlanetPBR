@@ -2,14 +2,14 @@
 
 ShaderCodeDefinition(GShaderUtils::LightingCommon)
 (
-    const float MaxLightIntensity = 50.0;
-
     const float PI = 3.1415926535897932384626433832795;
     const float ONE_OVER_2PI = 1.0 / (2.0 * PI);
     const float ONE_OVER_4PI = 1.0 / (4.0 * PI);
     const float ONE_OVER_PI = 1.0 / PI;
     const float HALF_PI = PI / 2.0;
     const float TWO_PI = 2 * PI;
+
+    const float MaxLightIntensity = 50.0;
 
 \n #ifndef _ATMO_USE_KILOMETERS \n
     const float Rg = 6360.0 * 1e3;
@@ -60,6 +60,11 @@ ShaderCodeDefinition(GShaderUtils::LightingCommon)
         return exp(-e * ds);
     }
 
+    float Powder(float e, float ds)
+    {
+        return 2.0 * exp(-ds * e) * (1.0 - exp(-ds * e * 2.0));
+    }
+
     float DualLobeFunction(float a, float g1, float g2, float w)
     {
         return mix(HenyeyGreensteinPhase(a, g1), HenyeyGreensteinPhase(a, g2), w);
@@ -79,30 +84,6 @@ ShaderCodeDefinition(GShaderUtils::LightingCommon)
         return mix(hgp, dp, w);
     }
 
-    float HGDPhaseCloud(float a)
-    {
-        float d = mix(5.0, 50.0, MieG);
-
-        float ghg = exp(-0.0990567 / (d - 1.67154));
-        float gd = exp(-2.20679 / (d + 3.91029) - 0.428934);
-        float kd = exp(3.62489 - (8.29288 / (d + 5.52825)));
-        float w = exp(-0.599085 / (d - 0.641583) - 0.665888);
-
-        return HGDPhase(a, ghg, gd, kd, w);
-    }
-
-    float HGDPhaseCloud(float a, float g)
-    {
-        float d = mix(5.0, 50.0, MieG);
-
-        float ghg = exp(-0.0990567 / (d - 1.67154));
-        float gd = exp(-2.20679 / (d + 3.91029) - 0.428934);
-        float kd = exp(3.62489 - (8.29288 / (d + 5.52825)));
-        float w = exp(-0.599085 / (d - 0.641583) - 0.665888);
-
-        return HGDPhase(a, g * ghg, g * gd, kd, w);
-    }
-
     float HGDPhase(float a)
     {
         float d = mix(1.5, 5.0, 1.0 - MieG);
@@ -117,7 +98,7 @@ ShaderCodeDefinition(GShaderUtils::LightingCommon)
 
     float HGDPhase(float a, float g)
     {
-        float d = mix(1.5, 5.0, 1.0 - MieG);
+        float d = mix(1.5, 5.0, 1.0 - g);
 
         float ghg = 0.0604931 * log(log(d)) + 0.940256;
         float gd = 0.500411 - 0.081287 / (-2 * log(d) + tan(log(d)) + 1.27551);
@@ -125,11 +106,6 @@ ShaderCodeDefinition(GShaderUtils::LightingCommon)
         float w = 0.026914 * (log(d) - cos(5.68947 * (log(log(d)) - 0.0292149))) + 0.376475;
 
         return HGDPhase(a, g * ghg, g * gd, kd, w);
-    }
-
-    float Powder(float e, float ds)
-    {
-        return 2.0 * exp(-ds * e) * (1.0 - exp(-ds * e * 2.0));
     }
 
     vec3 GetMie(vec4 RayMie)
@@ -228,8 +204,59 @@ ShaderCodeDefinition(GShaderUtils::LightingCommon)
         }
     }
 
+    vec3 GetAEP(sampler2D TransmittanceLUT, sampler3D InscatteringLUT, vec3 p0, vec3 p1, vec3 sun)
+    {
+        float r0 = length(p0);
+        float r1 = length(p1);
+
+        vec3 view = normalize(p1 - p0);
+
+        float edotv = dot(p0, view) / r0;
+        float pdotv = dot(p1, view) / r1;
+
+        float edotl = dot(p0, sun) / r0;
+        float pdotl = dot(p1, sun) / r1;
+        float vdotl = dot(view, sun);
+
+        vec3 T = GetTransmittance(TransmittanceLUT, r0, edotv, view, p1);
+
+        vec4 inScatter0 = GetInscattering(InscatteringLUT, r0, edotv, edotl, vdotl);
+        vec4 inScatter1 = GetInscattering(InscatteringLUT, r1, pdotv, pdotl, vdotl);
+
+        vec4 inscatter = max(inScatter0 - T.rgbr * inScatter1, 0.0);
+        inscatter.w *= smoothstep(0.00, 0.02, edotl);
+
+        float PhaseR = RayleighPhase(vdotl);
+        float PhaseM = HGDPhase(vdotl);
+
+        return MaxLightIntensity * max(inscatter.rgb * PhaseR, 0.0) + max(GetMie(inscatter) * PhaseM, 0.0);
+    }
+
+    vec3 GetAEP(sampler2D TransmittanceLUT, sampler3D InscatteringLUT, vec3 p0, float r0, vec3 p1, float r1, vec3 view, vec3 sun)
+    {
+        float edotv = dot(p0, view) / r0;
+        float pdotv = dot(p1, view) / r1;
+
+        float edotl = dot(p0, sun) / r0;
+        float pdotl = dot(p1, sun) / r1;
+        float vdotl = dot(view, sun);
+
+        vec3 T = GetTransmittance(TransmittanceLUT, r0, edotv, view, p1);
+
+        vec4 inScatter0 = GetInscattering(InscatteringLUT, r0, edotv, edotl, vdotl);
+        vec4 inScatter1 = GetInscattering(InscatteringLUT, r1, pdotv, pdotl, vdotl);
+
+        vec4 inscatter = max(inScatter0 - T.rgbr * inScatter1, 0.0);
+        inscatter.w *= smoothstep(0.00, 0.02, edotl);
+
+        float PhaseR = RayleighPhase(vdotl);
+        float PhaseM = HGDPhase(vdotl);
+
+        return MaxLightIntensity * max(inscatter.rgb * PhaseR, 0.0) + max(GetMie(inscatter) * PhaseM, 0.0);
+    }
+
     // precomputed-atmospheric-scattering
-    void AerialPerspective(sampler2D TransmittanceLUT, sampler2D IrradianceLUT, sampler3D InscatteringLUT, vec3 Eye, vec3 Target, vec3 Sun, out SAtmosphere Atmosphere)
+    void GetAtmosphere(sampler2D TransmittanceLUT, sampler2D IrradianceLUT, sampler3D InscatteringLUT, vec3 Eye, vec3 Target, vec3 Sun, out SAtmosphere Atmosphere)
     {
         float Re = length(Eye);
 
@@ -263,7 +290,6 @@ ShaderCodeDefinition(GShaderUtils::LightingCommon)
             PdotV = (Re * EdotV + Rpe) / Rp;
             vec4 inScatter0 = GetInscattering(InscatteringLUT, Re, EdotV, EdotL, VdotL);
             vec4 inScatter1 = GetInscattering(InscatteringLUT, Rp, PdotV, PdotL, VdotL);
-            inScatter1 = min(inScatter1, inScatter0);
             vec4 inScatterA = max(inScatter0 - Atmosphere.T.rgbr * inScatter1, 0.0);
 
             EdotV = muHoriz + EPS;
@@ -271,7 +297,6 @@ ShaderCodeDefinition(GShaderUtils::LightingCommon)
             PdotV = (Re * EdotV + Rpe) / Rp;
             inScatter0 = GetInscattering(InscatteringLUT, Re, EdotV, EdotL, VdotL);
             inScatter1 = GetInscattering(InscatteringLUT, Rp, PdotV, PdotL, VdotL);
-            inScatter1 = min(inScatter1, inScatter0);
             vec4 inScatterB = max(inScatter0 - Atmosphere.T.rgbr * inScatter1, 0.0);
 
             inscatter = mix(inScatterA, inScatterB, a);
@@ -280,7 +305,6 @@ ShaderCodeDefinition(GShaderUtils::LightingCommon)
         {
             vec4 inScatter0 = GetInscattering(InscatteringLUT, Re, EdotV, EdotL, VdotL);
             vec4 inScatter1 = GetInscattering(InscatteringLUT, Rp, PdotV, PdotL, VdotL);
-            inScatter1 = min(inScatter1, inScatter0);
             inscatter = max(inScatter0 - Atmosphere.T.rgbr * inScatter1, 0.0);
         }
 

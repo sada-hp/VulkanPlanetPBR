@@ -207,7 +207,7 @@ GAtmospherePrecomputeLUT::GAtmospherePrecomputeLUT(std::shared_ptr<RenderScope> 
 	auto ScatteringEvalStep = _addScatteringMultiEvalStep(Resources);
 	auto ScatteringAddStep = _addScatteringMultiAddStep(Resources);
 
-	for (uint32_t Order = 0; Order < 10; Order++)
+	for (uint32_t Order = 0; Order < 3; Order++)
 	{
 		m_precomputePasses.push_back(IrradianceStep);
 

@@ -33,14 +33,19 @@ namespace GVkImageFactory
 		return Image(Scope, VK_FORMAT_R8G8B8A8_UNORM, { Extents.width, Extents.height, 1 }, EImageFlags::InFlight | EImageFlags::Sampler | EImageFlags::RenderTarget | EImageFlags::TransferSource);
 	}
 
+	inline std::shared_ptr<GVkImage> RenderTargetFlight(std::shared_ptr<RenderScope> Scope, VkFormat Format, VkExtent2D Extents)
+	{
+		return Image(Scope, Format, { Extents.width, Extents.height, 1 }, EImageFlags::InFlight | EImageFlags::Sampler | EImageFlags::RenderTarget);
+	}
+
 	inline std::shared_ptr<GVkImage> ColorRenderTargetFlight(std::shared_ptr<RenderScope> Scope, VkExtent2D Extents)
 	{
-		return Image(Scope, RenderScope::GetColorFormat(), {Extents.width, Extents.height, 1}, EImageFlags::InFlight | EImageFlags::Sampler | EImageFlags::RenderTarget);
+		return RenderTargetFlight(Scope, RenderScope::GetColorFormat(), Extents);
 	}
 
 	inline std::shared_ptr<GVkImage> DepthRenderTargetFlight(std::shared_ptr<RenderScope> Scope, VkExtent2D Extents)
 	{
-		return Image(Scope, RenderScope::GetDepthFormat(), {Extents.width, Extents.height, 1}, EImageFlags::InFlight | EImageFlags::Sampler | EImageFlags::RenderTarget);
+		return RenderTargetFlight(Scope, RenderScope::GetDepthFormat(), Extents);
 	}
 
 	inline std::shared_ptr<GVkImage> ReadOnlySampler2D(std::shared_ptr<RenderScope> Scope, VkExtent2D Extents, void* Pixels, size_t PixelsSize)
