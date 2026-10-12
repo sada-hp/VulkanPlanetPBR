@@ -9,7 +9,7 @@ ShaderCodeDefinition(GShaderUtils::LightingCommon)
     const float HALF_PI = PI / 2.0;
     const float TWO_PI = 2 * PI;
 
-    const float MaxLightIntensity = 50.0;
+    const float MaxLightIntensity = 35.0;
 
 \n #ifndef _ATMO_USE_KILOMETERS \n
     const float Rg = 6360.0 * 1e3;
@@ -86,7 +86,7 @@ ShaderCodeDefinition(GShaderUtils::LightingCommon)
 
     float HGDPhase(float a)
     {
-        float d = mix(1.5, 5.0, 1.0 - MieG);
+        float d = mix(1.5, 15.0, 1.0 - MieG);
 
         float ghg = 0.0604931 * log(log(d)) + 0.940256;
         float gd = 0.500411 - 0.081287 / (-2 * log(d) + tan(log(d)) + 1.27551);
@@ -98,7 +98,7 @@ ShaderCodeDefinition(GShaderUtils::LightingCommon)
 
     float HGDPhase(float a, float g)
     {
-        float d = mix(1.5, 5.0, 1.0 - g);
+        float d = mix(1.5, 15.0, 1.0 - g);
 
         float ghg = 0.0604931 * log(log(d)) + 0.940256;
         float gd = 0.500411 - 0.081287 / (-2 * log(d) + tan(log(d)) + 1.27551);

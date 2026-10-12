@@ -285,22 +285,49 @@ std::shared_ptr<GVkRenderPass> RenderPassDescriptor::Construct(std::shared_ptr<R
 	for (auto& ref : firstSubpass.colorReferences)
 	{
 		auto& attachment = m_attachmentDescriptions[ref.attachment];
-		firstExternalDependency.dstStageMask |= _pipelineStageFromLayout(ref.layout, false);
-		firstExternalDependency.dstAccessMask |= _pipelineAccessFromLayout(ref.layout, false);
+
+		if (attachment.initialLayout != VK_IMAGE_LAYOUT_UNDEFINED)
+		{
+			firstExternalDependency.dstStageMask |= _pipelineStageFromLayout(attachment.initialLayout, false);
+			firstExternalDependency.dstAccessMask |= _pipelineAccessFromLayout(attachment.initialLayout, false);
+		}
+		else
+		{
+			firstExternalDependency.dstStageMask |= _pipelineStageFromLayout(ref.layout, false);
+			firstExternalDependency.dstAccessMask |= _pipelineAccessFromLayout(ref.layout, false);
+		}
 	}
 
 	for (auto& ref : firstSubpass.inputReferences)
 	{
 		auto& attachment = m_attachmentDescriptions[ref.attachment];
-		firstExternalDependency.dstStageMask |= _pipelineStageFromLayout(ref.layout, false);
-		firstExternalDependency.dstAccessMask |= _pipelineAccessFromLayout(ref.layout, false);
+
+		if (attachment.initialLayout != VK_IMAGE_LAYOUT_UNDEFINED)
+		{
+			firstExternalDependency.dstStageMask |= _pipelineStageFromLayout(attachment.initialLayout, false);
+			firstExternalDependency.dstAccessMask |= _pipelineAccessFromLayout(attachment.initialLayout, false);
+		}
+		else
+		{
+			firstExternalDependency.dstStageMask |= _pipelineStageFromLayout(ref.layout, false);
+			firstExternalDependency.dstAccessMask |= _pipelineAccessFromLayout(ref.layout, false);
+		}
 	}
 
 	if (firstSubpass.depthReference.attachment != VK_ATTACHMENT_UNUSED)
 	{
 		auto& attachment = m_attachmentDescriptions[firstSubpass.depthReference.attachment];
-		firstExternalDependency.dstStageMask |= _pipelineStageFromLayout(firstSubpass.depthReference.layout, false);
-		firstExternalDependency.dstAccessMask |= _pipelineAccessFromLayout(firstSubpass.depthReference.layout, false);
+
+		if (attachment.initialLayout != VK_IMAGE_LAYOUT_UNDEFINED)
+		{
+			firstExternalDependency.dstStageMask |= _pipelineStageFromLayout(attachment.initialLayout, false);
+			firstExternalDependency.dstAccessMask |= _pipelineAccessFromLayout(attachment.initialLayout, false);
+		}
+		else
+		{
+			firstExternalDependency.dstStageMask |= _pipelineStageFromLayout(firstSubpass.depthReference.layout, false);
+			firstExternalDependency.dstAccessMask |= _pipelineAccessFromLayout(firstSubpass.depthReference.layout, false);
+		}
 	}
 
 	subpassDependencies.push_back(firstExternalDependency);

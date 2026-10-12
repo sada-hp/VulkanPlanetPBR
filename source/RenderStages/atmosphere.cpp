@@ -5,7 +5,7 @@ GAtmosphereStage::GAtmosphereStage(std::shared_ptr<RenderScope> Scope, const GVk
 	: IRenderStage(Scope, VK_QUEUE_GRAPHICS_BIT)
 {
 	RenderPassDescriptor RPDesc{};
-	RPDesc.AddAttachmentDontCareOp(Resources.ColorBuffer->GetFormat());
+	RPDesc.AddAttachmentLoadOp(Resources.ColorBuffer->GetFormat(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 	RenderPass = RPDesc.Construct(Scope);
 
 	Framebuffer = std::make_shared<GVkFramebuffer>(Scope, RenderPass, std::vector{ Resources.ColorBuffer });
@@ -24,6 +24,12 @@ GAtmosphereStage::GAtmosphereStage(std::shared_ptr<RenderScope> Scope, const GVk
 		.AppendCode(GShaders::AtmospherePS);
 	PSODesc.AddDescriptorLayout(DescriptorSet->GetLayout());
 	PSODesc.SetRenderPass(RenderPass);
+
+	PSODesc.AttachmentBlendState(0).blendEnable = VK_TRUE;
+	PSODesc.AttachmentBlendState(0).colorBlendOp = VK_BLEND_OP_ADD;
+	PSODesc.AttachmentBlendState(0).srcColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
+	PSODesc.AttachmentBlendState(0).dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+
 	Pipeline = PSODesc.Construct(Scope);
 }
 

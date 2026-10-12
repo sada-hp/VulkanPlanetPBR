@@ -60,7 +60,7 @@ ShaderCodeDefinition(GShaderNoise::WorleyPS)
 
 	void main()
 	{
-		const int kernel[4] = { 1, 8, 16, 24 };
+		const int kernel[4] = { 1, 4, 12, 24 };
 
 		noise_out = vec4(0.0);
 		for (uint i = 0; i < 4; i++)
@@ -84,10 +84,15 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 	layout(binding = 5) uniform sampler3D CloudHighFrequency;
 
 	const float Coverage = 0.5;
-	const float Absorbtion = 8e-2;
+	const float Absorbtion = 1;
 	const float BottomBound = Rg + 0.25 * (Rt - Rg);
 	const float TopBound    = Rg + 0.60 * (Rt - Rg);
 	const float BoundDelta  = TopBound - BottomBound;
+
+	float GetAbsorbtion()
+	{
+		return mix(Absorbtion, Absorbtion * 0.01, Scattering.a);
+	}
 
 	vec3 GetUV(vec3 pos, float scale)
 	{
@@ -106,8 +111,8 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 
 		float heightInverted = 1.0 - heightFraction;
 
-		float h1 = pow(heightInverted, 1.5);
-		float h2 = saturate(remap(heightFraction, 0.0, 0.2, 0.0, 1.0));
+		float h1 = pow(heightInverted, 1.25);
+		float h2 = saturate(remap(heightFraction, 0.0, 0.175, 0.0, 1.0));
 
 		float shape_mod = 1.0 - Coverage * h1 * h2;
 
@@ -118,30 +123,30 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 	{
 		float cloud = SampleShape(pos, heightFraction);
 
-		if (cloud != 0.0)
+		if (cloud != 0.0 || Scattering.a > 1e-2)
 		{
 			vec3 sample_uv = GetUV(pos, 250.0);
 			vec4 high_freq_noise = texture(CloudHighFrequency, sample_uv);
 			float fbm = 0.625 * high_freq_noise.r + 0.25 * high_freq_noise.g + 0.125 * high_freq_noise.b;
 
-			float freq_mod = mix(fbm, 1.0 - fbm, saturate(heightFraction * 25));
-			freq_mod = mix(freq_mod * 0.15, freq_mod * 0.45, smoothstep(0.0, 1.0, heightFraction));
+			float freq_mod = mix(fbm, 1.0 - fbm, saturate(heightFraction * 15));
+			freq_mod = mix(freq_mod * 0.15, freq_mod * 0.45, heightFraction);
 
 			cloud = remap(cloud, freq_mod, 1.0, 0.0, 1.0);
 		}
 
-		return Absorbtion * saturate(cloud);
+		return GetAbsorbtion() * saturate(cloud);
 	}
 
 	float MultiScatter(float phi, float e, float ds)
 	{
 		float luminance = 0.0;
 		float a = 1.0, b = 1.0, c = MieG;
-		for (int i = 0; i < 15; i++)
+		for (int i = 0; i < 5; i++)
 		{
-			luminance += b * HGDPhase(phi, c) * Powder(e * a, ds);
+			luminance += b * HGDPhase(phi, c) * BeerLambert(e * a, ds);
 			a *= 0.5;
-			b *= 0.45;
+			b *= 0.35;
 			c *= 0.75;
 		}
 
@@ -155,6 +160,7 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 
 		const vec3 kernel[] =
 		{
+			vec3(0.0, 0.0, 0.0),
 			vec3(0.57735, 0.57735, 0.57735),
 			vec3(-0.677686, 0.690636, 0.252514),
 			vec3(0.289651, 0.1549, 0.944515),
@@ -164,35 +170,37 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 		};
 
 		float ds = len / 6.f;
-		for (int i = 0; i < 6; i++)
+		for (int i = 0; i <= 6; i++)
 		{
-			pos += (dir + kernel[i] * float(i)) * ds;
-			cone_density += SampleDensity(pos, GetHeight(pos)) * ds;
+			vec3 cone_dir = (dir + kernel[i] * float(i)) * ds;
+			pos += cone_dir;
+
+			cone_density += SampleDensity(pos, GetHeight(pos)) * length(cone_dir);
 			ds *= i < 4 ? 1.0 : 2.0;
 		}
 
-		return Absorbtion * cone_density;
+		return GetAbsorbtion() * cone_density;
 	}
 
 	float StepRaySmooth(float ds, float w)
 	{
-		return smoothstep(0.0, 2.0, w) * ds * 5.3262290811553903259871638305242;
+		return max(ds * smoothstep(0.0, 2.0, w) * 5.3262290811553903259871638305242, 0.1 * ds);
 	}
 
-	vec3 EvaluateLight(vec3 pos, float R)
+	vec3 EvaluateLight(vec3 pos, float rdotl)
 	{
 		const vec3 dir = UBO.sun_dir.xyz;
-		const float len = min(sphere_intersection(pos, dir, vec3(0.0), TopBound), 0.25 * BoundDelta);
+		const float len = min(sphere_intersection(pos, dir, vec3(0.0), TopBound), 0.1 * BoundDelta);
 
 		float density = SampleCone(pos, len);
-		float transmittance = BeerLambert(density, 1.0);
+		float transmittance = MultiScatter(rdotl, density, 1.0);
 
 		return vec3(MaxLightIntensity * transmittance);
 	}
 
 	bool SearchCloud(inout vec3 ray_pos, vec3 end)
 	{
-		const float steps = 64;
+		const float steps = 128;
 		float ds = distance(end, ray_pos) / steps;
 		const vec3 ray_dir = normalize(end - ray_pos);
 
@@ -223,8 +231,8 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 
 		const vec3 eye_n = normalize(eye);
 		const vec3 ray_dir = normalize(end - begin);
-		const float horizon = max(dot(ray_dir, eye_n), 0.0);
-		const float steps = ceil(mix(128.f, 48.f, horizon));
+		const float horizon = max(dot(ray_dir, eye_n), 0);
+		const float steps = ceil(mix(96.f, 32.f, horizon));
 
 		const float edotl = dot(sun_dir, eye) / Re;
 		const float rdotl = dot(sun_dir, ray_dir);
@@ -233,7 +241,9 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 		float height = GetHeight(ray_pos);
 		float ray_depth = height * BoundDelta + BottomBound;
 
+		Scattering = vec4(0.0, 0.0, 0.0, 1.0);
 		float ds = distance(end, begin) / steps;
+
 		for (float i = 0; i < steps; i++)
 		{
 			// save state
@@ -253,13 +263,12 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 			if (sample_density > 0.0)
 			{
 				float extinction = sample_density;
-				float phase = MultiScatter(rdotl, extinction, step_size);
 				float transmittance = BeerLambert(extinction, step_size);
 
 				vec3 T = GetTransmittanceWithShadow(TransmittanceLUT, ray_depth, dot(sun_dir, ray_pos) / ray_depth, Re, edotl);
 				vec3 S = GetAEP(TransmittanceLUT, InscatteringLUT, old_pos, old_depth, ray_pos, ray_depth, ray_dir, sun_dir);
 
-				vec3 E = extinction * phase * EvaluateLight(ray_pos, ray_depth);
+				vec3 E = extinction * EvaluateLight(ray_pos, rdotl);
 				E = (E - E * transmittance) / extinction;
 
 				Scattering.rgb += Scattering.a * (T * E + S);
@@ -271,6 +280,7 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 		}
 
 		Scattering.rgb += smootherstep(0.0, 1.0, Coverage) * GetAEP(TransmittanceLUT, InscatteringLUT, eye, begin, sun_dir) * (1.0 - Scattering.a);
+		Scattering.a = 1.0 - Scattering.a;
 	}
 
 	void main()
@@ -278,15 +288,16 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 		vec4 screen_pos = vec4(2.0 * UV - 1.0, 0.0, 1.0);
 		screen_pos = UBO.view_proj_inv * screen_pos;
 
+		Scattering = vec4(0.0);
 		vec3 eye_pos = UBO.eye_pos.xyz;
 		vec3 ray_dir = normalize(screen_pos.xyz / screen_pos.w);
 
-		Scattering = vec4(0.0, 0.0, 0.0, 1.0);
-		if (sphere_intersection(eye_pos, ray_dir, vec3(0.0), Rg) == 0.0)
-		{
-			float dt = sphere_intersection(eye_pos, ray_dir, vec3(0.0), TopBound);
-			float db = sphere_intersection(eye_pos, ray_dir, vec3(0.0), BottomBound);
+		float dg = sphere_intersection(eye_pos, ray_dir, vec3(0.0), Rg);
+		float dt = sphere_intersection(eye_pos, ray_dir, vec3(0.0), TopBound);
+		float db = sphere_intersection(eye_pos, ray_dir, vec3(0.0), BottomBound);
 
+		if (dg == 0.0)
+		{
 			vec3 ray_origin = eye_pos + ray_dir * min(dt, db);
 			vec3 ray_end = eye_pos + ray_dir * max(dt, db);
 

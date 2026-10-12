@@ -2,7 +2,9 @@
 
 ShaderCodeDefinition(GShaderPrecomputeLUT::IrradianceMultiStepPS)
 (
-    layout(location = 0) out vec4 Irradiance;
+    layout(location = 0) out vec4 DeltaIrradiance;
+    layout(location = 1) out vec4 Irradiance;
+
 	layout(location = 0) in vec2 UV;
 
     layout(binding = 0) uniform sampler3D DeltaSR;
@@ -42,6 +44,8 @@ ShaderCodeDefinition(GShaderPrecomputeLUT::IrradianceMultiStepPS)
 	{
         float R, Mu;
         GetIrradienceRMu(UV, R, Mu);
-        Irradiance = vec4(ComputeDeltaEn(R, Mu), 0.0);
+
+        DeltaIrradiance = vec4(ComputeDeltaEn(R, Mu), 0.0);
+        Irradiance = DeltaIrradiance;
 	}
 );

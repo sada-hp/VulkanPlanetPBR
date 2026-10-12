@@ -1,7 +1,7 @@
+#include "swapchain.hpp"
+
 #define GLFW_INCLUDE_VULKAN
 #include <glfw/glfw3.h>
-
-#include "swapchain.hpp"
 
 GVkSwapchain::GVkSwapchain(const std::shared_ptr<RenderScope>& InScope, GLFWwindow* window)
 	: Scope(InScope)

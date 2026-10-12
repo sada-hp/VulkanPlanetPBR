@@ -2,6 +2,7 @@
 #include <string>
 
 #define Stringify(...) #__VA_ARGS__
+#define StringifyMacro(x) Stringify(x)
 #define ShaderCodeType const std::string
 #define ShaderCodeDefinition(x, ...) ShaderCodeType x = Stringify
 

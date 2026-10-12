@@ -25,6 +25,7 @@ private:
 private:
 	struct
 	{
+		std::shared_ptr<GVkImage> DeltaE = VK_NULL_HANDLE;
 		std::shared_ptr<GVkImage> DeltaJ = VK_NULL_HANDLE;
 		std::shared_ptr<GVkImage> DeltaSR = VK_NULL_HANDLE;
 		std::shared_ptr<GVkImage> DeltaSM = VK_NULL_HANDLE;

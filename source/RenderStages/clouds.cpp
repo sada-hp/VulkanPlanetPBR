@@ -5,14 +5,18 @@
 GCloudsStage::GCloudsStage(std::shared_ptr<RenderScope> Scope, const GVkSharedResources& Resources)
 	: IRenderStage(Scope, VK_QUEUE_GRAPHICS_BIT)
 {
-	Images.PerlinWorley = _generate_noise(GShaderNoise::PerlinWorleyPS, VK_FORMAT_R32_SFLOAT, VkExtent3D{ 128, 128, 128 }, 4, 16);
-	Images.HighFrequency = _generate_noise(GShaderNoise::WorleyPS, VK_FORMAT_R32G32B32A32_SFLOAT, VkExtent3D{ 64, 64, 64 }, 8, 2);
+	Images.PerlinWorley = _generate_noise(GShaderNoise::PerlinWorleyPS, VK_FORMAT_R32_SFLOAT, VkExtent3D{ 128, 128, 128 }, 8, 5);
+	Images.HighFrequency = _generate_noise(GShaderNoise::WorleyPS, VK_FORMAT_R32G32B32A32_SFLOAT, VkExtent3D{ 64, 64, 64 }, 6, 3);
+
+	VkExtent2D ExtentLR = { Resources.ColorBuffer->GetExtent().width / 2, Resources.ColorBuffer->GetExtent().height / 2 };
+	Images.CloudsLR = GVkImageFactory::ColorRenderTargetFlight(Scope, ExtentLR);
+	Images.ColorHR = Resources.ColorBuffer;
 
 	RenderPassDescriptor RPDesc{};
-	RPDesc.AddAttachmentLoadOp(Resources.ColorBuffer->GetFormat(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	RPDesc.AddAttachmentClearOp(Images.CloudsLR->GetFormat());
 	RenderPass = RPDesc.Construct(Scope);
 
-	Framebuffer = std::make_shared<GVkFramebuffer>(Scope, RenderPass, std::vector{ Resources.ColorBuffer });
+	Framebuffer = std::make_shared<GVkFramebuffer>(Scope, RenderPass, std::vector{ Images.CloudsLR });
 
 	DescriptorSetDescriptor DSDesc{};
 	DSDesc.AddUniformBuffer(VK_SHADER_STAGE_FRAGMENT_BIT, GVkBuffer::ToView(Resources.UBO));
@@ -33,10 +37,6 @@ GCloudsStage::GCloudsStage(std::shared_ptr<RenderScope> Scope, const GVkSharedRe
 		.AppendCode(GShaderUtils::UBOCommon)
 		.AppendCode(GShaders::CloudsPS);
 
-	PSODesc.AttachmentBlendState(0).blendEnable = VK_TRUE;
-	PSODesc.AttachmentBlendState(0).colorBlendOp = VK_BLEND_OP_ADD;
-	PSODesc.AttachmentBlendState(0).srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-	PSODesc.AttachmentBlendState(0).dstColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
 	Pipeline = PSODesc.Construct(Scope);
 }
 
@@ -102,5 +102,8 @@ void GCloudsStage::Execute(const GCamera& Camera, const IWorld& World)
 	CommandBuffer->BindPipeline(Pipeline);
 	CommandBuffer->BindDescriptorSet(0, DescriptorSet);
 	CommandBuffer->Draw(3);
+	CommandBuffer->EndRenderPass();
+
+	CommandBuffer->BlitImage(GVkImage::ToView(Images.CloudsLR), GVkImage::ToView(Images.ColorHR));
 	CommandBuffer->Submit();
 }

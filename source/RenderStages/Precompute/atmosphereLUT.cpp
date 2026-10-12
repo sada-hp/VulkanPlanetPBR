@@ -97,7 +97,7 @@ GAtmospherePrecomputeLUT::GLutPass GAtmospherePrecomputeLUT::_addScatteringMulti
 
 	DescriptorSetDescriptor DSDesc{};
 	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Resources.TransmittanceLUT), GVkSamplerFactory::LinearSamplerRepeat(Scope));
-	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Resources.IrradianceLUT), GVkSamplerFactory::LinearSamplerRepeat(Scope));
+	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Images.DeltaE), GVkSamplerFactory::LinearSamplerRepeat(Scope));
 	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Images.DeltaSR), GVkSamplerFactory::LinearSamplerRepeat(Scope));
 	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Images.DeltaSM), GVkSamplerFactory::LinearSamplerRepeat(Scope));
 	Pass.Set = DSDesc.Allocate(Scope);
@@ -155,10 +155,11 @@ GAtmospherePrecomputeLUT::GLutPass GAtmospherePrecomputeLUT::_addIrradianceMulti
 {
 	GLutPass Pass{};
 	RenderPassDescriptor RPDesc{};
+	RPDesc.AddAttachmentDontCareOp(Resources.IrradianceLUT->GetFormat());
 	RPDesc.AddAttachmentLoadOp(Resources.IrradianceLUT->GetFormat(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	Pass.RenderPass = RPDesc.Construct(Scope);
 
-	Pass.Framebuffer = std::make_shared<GVkFramebuffer>(Scope, Pass.RenderPass, std::vector{ Resources.IrradianceLUT });
+	Pass.Framebuffer = std::make_shared<GVkFramebuffer>(Scope, Pass.RenderPass, std::vector{ Images.DeltaE, Resources.IrradianceLUT });
 
 	DescriptorSetDescriptor DSDesc{};
 	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Images.DeltaSR), GVkSamplerFactory::LinearSamplerRepeat(Scope));
@@ -174,10 +175,10 @@ GAtmospherePrecomputeLUT::GLutPass GAtmospherePrecomputeLUT::_addIrradianceMulti
 	PSODesc.AddDescriptorLayout(Pass.Set->GetLayout());
 	PSODesc.SetRenderPass(Pass.RenderPass);
 
-	PSODesc.AttachmentBlendState(0).blendEnable = VK_TRUE;
-	PSODesc.AttachmentBlendState(0).colorBlendOp = VK_BLEND_OP_ADD;
-	PSODesc.AttachmentBlendState(0).dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
-	PSODesc.AttachmentBlendState(0).srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+	PSODesc.AttachmentBlendState(1).blendEnable = VK_TRUE;
+	PSODesc.AttachmentBlendState(1).colorBlendOp = VK_BLEND_OP_ADD;
+	PSODesc.AttachmentBlendState(1).dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+	PSODesc.AttachmentBlendState(1).srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
 	Pass.Pipeline = PSODesc.Construct(Scope);
 
 	return Pass;
@@ -192,6 +193,7 @@ void GAtmospherePrecomputeLUT::_initImages(GVkSharedResources& Resources)
 	Images.DeltaSM = GVkImageFactory::Image(Scope, VK_FORMAT_R16G16B16A16_SFLOAT, VkExtent3D{ 256, 128, 64 }, EImageFlags::Sampler | EImageFlags::RenderTarget);
 	Images.DeltaSR = GVkImageFactory::Image(Scope, VK_FORMAT_R16G16B16A16_SFLOAT, VkExtent3D{ 256, 128, 64 }, EImageFlags::Sampler | EImageFlags::RenderTarget);
 	Images.DeltaJ = GVkImageFactory::Image(Scope, VK_FORMAT_R16G16B16A16_SFLOAT, VkExtent3D{ 256, 128, 64 }, EImageFlags::Sampler | EImageFlags::RenderTarget);
+	Images.DeltaE = GVkImageFactory::Image(Scope, VK_FORMAT_R16G16B16A16_SFLOAT, VkExtent3D{ 64, 16, 1 }, EImageFlags::Sampler | EImageFlags::RenderTarget);
 }
 
 GAtmospherePrecomputeLUT::GAtmospherePrecomputeLUT(std::shared_ptr<RenderScope> InScope, GVkSharedResources& Resources)
@@ -207,7 +209,7 @@ GAtmospherePrecomputeLUT::GAtmospherePrecomputeLUT(std::shared_ptr<RenderScope> 
 	auto ScatteringEvalStep = _addScatteringMultiEvalStep(Resources);
 	auto ScatteringAddStep = _addScatteringMultiAddStep(Resources);
 
-	for (uint32_t Order = 0; Order < 3; Order++)
+	for (uint32_t Order = 0; Order < 5; Order++)
 	{
 		m_precomputePasses.push_back(IrradianceStep);
 

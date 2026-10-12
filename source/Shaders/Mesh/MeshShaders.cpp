@@ -21,7 +21,7 @@ ShaderCodeDefinition(GShaders::MeshVS)
 	void main()
 	{
 		dvec4 WorldPositionFP64 = Transform.Matrix * dvec4(vertPosition, 1.0);
-		gl_Position = vec4(UBO.view_proj * WorldPositionFP64);
+		gl_Position = vec4(UBO.view_proj_fl64 * WorldPositionFP64);
 
 		fragPosition = vec3(WorldPositionFP64);
 		fragSubmesh = vertSubmesh;

@@ -76,6 +76,18 @@ void GVkCommandBuffer::_nextSubpass()
 	}
 }
 
+VkCommandBuffer GVkCommandBuffer::GetCommandBuffer()
+{
+	auto& object = _activeObj();
+	return object.cmd;
+}
+
+void GVkCommandBuffer::Wait()
+{
+	for (auto& object : m_flightResources)
+		object.fence->Wait();
+}
+
 void GVkCommandBuffer::Submit()
 {
 	auto& object = _activeObj();
@@ -177,6 +189,38 @@ void GVkCommandBuffer::BlitImage(std::shared_ptr<GVkImageView> Image, std::share
 
 	object.acquired_resources.emplace_back(Swapchain);
 	object.acquired_resources.emplace_back(Image);
+}
+
+void GVkCommandBuffer::BlitImage(std::shared_ptr<GVkImageView> Source, std::shared_ptr<GVkImageView> Destination)
+{
+	auto& object = _updateRecording();
+
+	VkImageBlit imageBlit{};
+	imageBlit.srcSubresource.aspectMask = Source->GetSubresource().aspectMask;
+	imageBlit.srcSubresource.baseArrayLayer = Source->BaseLayer();
+	imageBlit.srcSubresource.layerCount = Source->GetLayerCount();
+	imageBlit.srcSubresource.mipLevel = Source->BaseLevel();
+
+	imageBlit.srcOffsets[1].x = Source->GetRoot()->GetExtent(Source->BaseLevel()).width;
+	imageBlit.srcOffsets[1].y = Source->GetRoot()->GetExtent(Source->BaseLevel()).height;
+	imageBlit.srcOffsets[1].z = Source->GetRoot()->GetExtent(Source->BaseLevel()).depth;
+
+	imageBlit.dstSubresource.aspectMask = Destination->GetSubresource().aspectMask;
+	imageBlit.dstSubresource.baseArrayLayer = Destination->BaseLayer();
+	imageBlit.dstSubresource.layerCount = Destination->GetLayerCount();
+	imageBlit.dstSubresource.mipLevel = Destination->BaseLevel();
+
+	imageBlit.dstOffsets[1].x = Destination->GetRoot()->GetExtent(Destination->BaseLevel()).width;
+	imageBlit.dstOffsets[1].y = Destination->GetRoot()->GetExtent(Destination->BaseLevel()).height;
+	imageBlit.dstOffsets[1].z = Destination->GetRoot()->GetExtent(Destination->BaseLevel()).depth;
+
+	BindBarrier<GVkTransferSrcBarrier>(Source);
+	BindBarrier<GVkTransferDstBarrier>(Destination);
+
+	vkCmdBlitImage(object.cmd, Source->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Destination->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageBlit, VK_FILTER_LINEAR);
+
+	object.acquired_resources.emplace_back(Destination);
+	object.acquired_resources.emplace_back(Source);
 }
 
 void GVkCommandBuffer::BeginRenderPass(std::shared_ptr<GVkRenderPass> RenderPass, std::shared_ptr<GVkFramebuffer> Framebuffer)

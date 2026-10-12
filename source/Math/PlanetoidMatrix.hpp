@@ -12,6 +12,13 @@ protected:
 	LocalMatrix local_offset;
 
 public:
+	EllipsoidMatrix() = default;
+
+	EllipsoidMatrix(const EllipsoidMatrix& other)
+	{
+		local_offset = other.local_offset;
+	}
+
 	LocalMatrix& GetLocalMatrix()
 	{
 		return local_offset;

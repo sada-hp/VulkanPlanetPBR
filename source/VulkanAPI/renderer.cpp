@@ -1,4 +1,5 @@
 #include "pch.hpp"
+#include "ubo.hpp"
 #include "glfw/glfw3.h"
 #include "renderer.hpp"
 #include "Factories/VkImageFactory.hpp"
@@ -9,17 +10,6 @@
 #include "RenderStages/tonemapping.hpp"
 #include "RenderStages/atmosphere.hpp"
 #include "RenderStages/clouds.hpp"
-
-struct _UniformBuffer
-{
-	glm::mat4 view_proj;
-	glm::mat4 view_proj_inv;
-
-	glm::vec4 sun_dir;
-	glm::vec4 eye_pos;
-
-	float Time;
-};
 
 GVulkanBase::GVulkanBase(GLFWwindow* window)
 {
@@ -37,10 +27,10 @@ GVulkanBase::GVulkanBase(GLFWwindow* window)
 	GAtmospherePrecomputeLUT::Execute(m_Scope, m_Resources);
 
 	// render stages
-	m_RenderStages.emplace_back(new GAtmosphereStage(m_Scope, m_Resources));
-	m_RenderStages.emplace_back(new GCloudsStage(m_Scope, m_Resources));
-	m_RenderStages.emplace_back(new GMeshStage(m_Scope, m_Resources));
-	m_RenderStages.emplace_back(new GTonemapStage(m_Scope, m_Resources));
+	AddRenderStage<GCloudsStage>();
+	AddRenderStage<GMeshStage>();
+	AddRenderStage<GAtmosphereStage>();
+	AddRenderStage<GTonemapStage>();
 }
 
 GVulkanBase::~GVulkanBase()
@@ -61,11 +51,12 @@ bool GVulkanBase::Draw(const GCamera& Camera, const IWorld& World)
 		glm::dmat4 proj  = Camera.ProjectionMat4();
 
 		_UniformBuffer UBO{};
-		UBO.view_proj = proj * view;
+		UBO.view_proj_fl64 = proj * view;
+		UBO.view_proj = UBO.view_proj_fl64;
 		UBO.view_proj_inv = glm::inverse(view) * glm::inverse(proj);
-		UBO.sun_dir = glm::vec4(glm::normalize(glm::vec3(1.0, 1.0, 0.5)), 0.0);
+		UBO.sun_dir = glm::vec4(World.GetSunDirection(), 0.0);
 		UBO.eye_pos = glm::vec4(Camera.GetWorldMatrix().GetPosition(), 1.0);
-		UBO.Time = glfwGetTime();
+		UBO.time = glfwGetTime();
 
 		memcpy(m_Resources.UBO->Map(), &UBO, sizeof(UBO));
 		m_Resources.UBO->UnMap();

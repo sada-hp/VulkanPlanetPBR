@@ -35,7 +35,7 @@ namespace GVkImageFactory
 
 	inline std::shared_ptr<GVkImage> RenderTargetFlight(std::shared_ptr<RenderScope> Scope, VkFormat Format, VkExtent2D Extents)
 	{
-		return Image(Scope, Format, { Extents.width, Extents.height, 1 }, EImageFlags::InFlight | EImageFlags::Sampler | EImageFlags::RenderTarget);
+		return Image(Scope, Format, { Extents.width, Extents.height, 1 }, EImageFlags::InFlight | EImageFlags::Sampler | EImageFlags::RenderTarget | EImageFlags::TransferSource | EImageFlags::TransferTarget);
 	}
 
 	inline std::shared_ptr<GVkImage> ColorRenderTargetFlight(std::shared_ptr<RenderScope> Scope, VkExtent2D Extents)

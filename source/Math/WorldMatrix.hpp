@@ -10,6 +10,13 @@ protected:
 	glm::vec<3, TOffset> offset = glm::vec<3, TOffset>(0.0);
 
 public:
+	TransformMatrix() = default;
+	TransformMatrix(const TransformMatrix& other)
+	{
+		angles = other.angles;
+		offset = other.offset;
+	}
+
 	template<typename Type = TOffset>
 	glm::vec<3, Type> GetPosition() const
 	{

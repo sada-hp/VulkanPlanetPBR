@@ -34,4 +34,10 @@ protected:
 public:
 	bool Draw(const GCamera& Camera, const IWorld& World);
 	std::shared_ptr<RenderScope> GetScope() const { return m_Scope; }
+
+	template<typename T, typename ...Args>
+	inline void AddRenderStage(Args&& ...args)
+	{
+		m_RenderStages.push_back(new T(m_Scope, m_Resources, args...));
+	}
 };

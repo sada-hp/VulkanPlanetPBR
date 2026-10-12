@@ -55,8 +55,12 @@ public:
 	GVkCommandBuffer(std::shared_ptr<RenderScope> Scope, VkQueueFlagBits Queue, ECmdFlags Flags = ECmdFlags::Default);
 	~GVkCommandBuffer();
 
+	VkCommandBuffer GetCommandBuffer();
+
+	void Wait();
 	void Submit();
 	void BlitImage(std::shared_ptr<GVkImageView> Image, std::shared_ptr<GVkSwapchain> Swapchain);
+	void BlitImage(std::shared_ptr<GVkImageView> Source, std::shared_ptr<GVkImageView> Destination);
 
 	void UpdateBuffer(std::shared_ptr<GVkBufferView> View, char* Data);
 	void CopyBuffer(std::shared_ptr<GVkBufferView> BufferSrc, std::shared_ptr<GVkBufferView> BufferDst);

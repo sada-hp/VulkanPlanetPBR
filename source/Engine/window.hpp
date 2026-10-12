@@ -114,4 +114,9 @@ public:
 	* !@brief Process window event queue
 	*/
 	void ProcessEvents() const;
+
+	GLFWwindow* PlatformWindow() const 
+	{
+		return m_GlfwWindow;
+	}
 };
