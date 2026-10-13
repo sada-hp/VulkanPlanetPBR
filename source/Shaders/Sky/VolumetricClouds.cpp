@@ -84,14 +84,13 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 	layout(binding = 5) uniform sampler3D CloudHighFrequency;
 
 	const float Coverage = 0.5;
-	const float Absorbtion = 1;
 	const float BottomBound = Rg + 0.25 * (Rt - Rg);
 	const float TopBound    = Rg + 0.60 * (Rt - Rg);
 	const float BoundDelta  = TopBound - BottomBound;
 
 	float GetAbsorbtion()
 	{
-		return mix(Absorbtion, Absorbtion * 0.01, Scattering.a);
+		return mix(0.25, 0.0025, Scattering.a);
 	}
 
 	vec3 GetUV(vec3 pos, float scale)
@@ -112,7 +111,7 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 		float heightInverted = 1.0 - heightFraction;
 
 		float h1 = pow(heightInverted, 1.25);
-		float h2 = saturate(remap(heightFraction, 0.0, 0.175, 0.0, 1.0));
+		float h2 = saturate(remap(heightFraction, 0.0, 0.125, 0.0, 1.0));
 
 		float shape_mod = 1.0 - Coverage * h1 * h2;
 
@@ -125,7 +124,7 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 
 		if (cloud != 0.0 || Scattering.a > 1e-2)
 		{
-			vec3 sample_uv = GetUV(pos, 250.0);
+			vec3 sample_uv = GetUV(pos, 350.0);
 			vec4 high_freq_noise = texture(CloudHighFrequency, sample_uv);
 			float fbm = 0.625 * high_freq_noise.r + 0.25 * high_freq_noise.g + 0.125 * high_freq_noise.b;
 
@@ -200,7 +199,7 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 
 	bool SearchCloud(inout vec3 ray_pos, vec3 end)
 	{
-		const float steps = 128;
+		const float steps = 64;
 		float ds = distance(end, ray_pos) / steps;
 		const vec3 ray_dir = normalize(end - ray_pos);
 
@@ -208,16 +207,19 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 		float sample_density = 0.0;
 		for (float i = 0; i < steps; i++)
 		{
-			ray_pos += ray_dir * ds;
-			sample_density = SampleDensity(ray_pos, GetHeight(ray_pos));
+			vec3 temp_pos = ray_pos + ray_dir * ds;
+			sample_density = SampleDensity(temp_pos, GetHeight(temp_pos));
 
-			// refine
 			if (sample_density != 0)
 			{
-				ray_pos -= ray_dir * ds;
-				ds = ds / 2.0;
+				if (found)
+					return true;
+
+				ds = ds / (steps - i);
 				found = true;
 			}
+			else
+				ray_pos = temp_pos;
 		}
 
 		return found;
@@ -234,8 +236,8 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 		const float horizon = max(dot(ray_dir, eye_n), 0);
 		const float steps = ceil(mix(96.f, 32.f, horizon));
 
-		const float edotl = dot(sun_dir, eye) / Re;
-		const float rdotl = dot(sun_dir, ray_dir);
+		const float edotl = saturate(dot(sun_dir, eye) / Re);
+		const float rdotl = saturate(dot(sun_dir, ray_dir));
 
 		vec3 ray_pos = begin;
 		float height = GetHeight(ray_pos);
@@ -265,7 +267,8 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 				float extinction = sample_density;
 				float transmittance = BeerLambert(extinction, step_size);
 
-				vec3 T = GetTransmittanceWithShadow(TransmittanceLUT, ray_depth, dot(sun_dir, ray_pos) / ray_depth, Re, edotl);
+				float pdotl = dot(sun_dir, ray_pos) / ray_depth;
+				vec3 T = GetTransmittanceWithShadow(TransmittanceLUT, ray_depth, pdotl, Re, edotl);
 				vec3 S = GetAEP(TransmittanceLUT, InscatteringLUT, old_pos, old_depth, ray_pos, ray_depth, ray_dir, sun_dir);
 
 				vec3 E = extinction * EvaluateLight(ray_pos, rdotl);
@@ -279,7 +282,7 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 				break;
 		}
 
-		Scattering.rgb += smootherstep(0.0, 1.0, Coverage) * GetAEP(TransmittanceLUT, InscatteringLUT, eye, begin, sun_dir) * (1.0 - Scattering.a);
+		Scattering.rgb += GetAEP(TransmittanceLUT, InscatteringLUT, eye, begin, sun_dir) * (1.0 - Scattering.a);
 		Scattering.a = 1.0 - Scattering.a;
 	}
 

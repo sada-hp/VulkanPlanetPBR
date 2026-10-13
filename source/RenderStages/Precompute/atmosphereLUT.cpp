@@ -49,21 +49,19 @@ GAtmospherePrecomputeLUT::GLutPass GAtmospherePrecomputeLUT::_addIrradiancePass(
 	return Pass;
 }
 
-GAtmospherePrecomputeLUT::GLutPass GAtmospherePrecomputeLUT::_addSignleScatteringPass(GVkSharedResources& Resources)
+GAtmospherePrecomputeLUT::GLutPass GAtmospherePrecomputeLUT::_addSingleScatteringPass(GVkSharedResources& Resources)
 {
 	GLutPass Pass{};
 
 	RenderPassDescriptor RPDesc{};
 	RPDesc.AddAttachmentDontCareOp(Images.DeltaSR->GetFormat());
 	RPDesc.AddAttachmentDontCareOp(Images.DeltaSM->GetFormat());
-	RPDesc.AddAttachmentDontCareOp(Resources.ScatteringLUT->GetFormat());
 	Pass.RenderPass = RPDesc.Construct(Scope);
 
 	std::vector framebufferAttachments =
 	{
 		GVkImage::ToView(Images.DeltaSR,		  VK_IMAGE_VIEW_TYPE_2D_ARRAY),
 		GVkImage::ToView(Images.DeltaSM,		  VK_IMAGE_VIEW_TYPE_2D_ARRAY),
-		GVkImage::ToView(Resources.ScatteringLUT, VK_IMAGE_VIEW_TYPE_2D_ARRAY)
 	};
 
 	Pass.Framebuffer = std::make_shared<GVkFramebuffer>(Scope, Pass.RenderPass, framebufferAttachments);
@@ -79,6 +77,35 @@ GAtmospherePrecomputeLUT::GLutPass GAtmospherePrecomputeLUT::_addSignleScatterin
 		.AppendCode(GShaderUtils::LightingCommon)
 		.AppendCode(GShaderPrecomputeLUT::LUTCommon)
 		.AppendCode(GShaderPrecomputeLUT::SingleScatteringPS);
+	PSODesc.AddDescriptorLayout(Pass.Set->GetLayout());
+	PSODesc.SetRenderPass(Pass.RenderPass);
+	Pass.Pipeline = PSODesc.Construct(Scope);
+
+	return Pass;
+}
+
+GAtmospherePrecomputeLUT::GLutPass GAtmospherePrecomputeLUT::_addSingleScatteringCopyPass(GVkSharedResources& Resources)
+{
+	GLutPass Pass{};
+
+	RenderPassDescriptor RPDesc{};
+	RPDesc.AddAttachmentDontCareOp(Resources.ScatteringLUT->GetFormat());
+	Pass.RenderPass = RPDesc.Construct(Scope);
+
+	Pass.Framebuffer = std::make_shared<GVkFramebuffer>(Scope, Pass.RenderPass, std::vector{ GVkImage::ToView(Resources.ScatteringLUT, VK_IMAGE_VIEW_TYPE_2D_ARRAY) });
+
+	DescriptorSetDescriptor DSDesc{};
+	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Images.DeltaSR), GVkSamplerFactory::LinearSamplerRepeat(Scope));
+	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Images.DeltaSM), GVkSamplerFactory::LinearSamplerRepeat(Scope));
+	Pass.Set = DSDesc.Allocate(Scope);
+
+	GraphicsPipelineDescriptor PSODesc{};
+	PSODesc.VS.AppendCode(GShaders::FullscreenLayeredVS);
+	PSODesc.GS.AppendCode(GShaderPrecomputeLUT::ScatteringGS);
+	PSODesc.PS.AddDefine("_ATMO_USE_KILOMETERS")
+		.AppendCode(GShaderUtils::LightingCommon)
+		.AppendCode(GShaderPrecomputeLUT::LUTCommon)
+		.AppendCode(GShaderPrecomputeLUT::CopySingleScatteringPS);
 	PSODesc.AddDescriptorLayout(Pass.Set->GetLayout());
 	PSODesc.SetRenderPass(Pass.RenderPass);
 	Pass.Pipeline = PSODesc.Construct(Scope);
@@ -146,6 +173,8 @@ GAtmospherePrecomputeLUT::GLutPass GAtmospherePrecomputeLUT::_addScatteringMulti
 	PSODesc.AttachmentBlendState(0).colorBlendOp = VK_BLEND_OP_ADD;
 	PSODesc.AttachmentBlendState(0).dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
 	PSODesc.AttachmentBlendState(0).srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+	PSODesc.AttachmentBlendState(0).dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+	PSODesc.AttachmentBlendState(0).srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
 	Pass.Pipeline = PSODesc.Construct(Scope);
 
 	return Pass;
@@ -203,13 +232,14 @@ GAtmospherePrecomputeLUT::GAtmospherePrecomputeLUT(std::shared_ptr<RenderScope> 
 
 	m_precomputePasses.push_back(_addTransmittancePass(Resources));
 	m_precomputePasses.push_back(_addIrradiancePass(Resources));
-	m_precomputePasses.push_back(_addSignleScatteringPass(Resources));
+	m_precomputePasses.push_back(_addSingleScatteringPass(Resources));
+	m_precomputePasses.push_back(_addSingleScatteringCopyPass(Resources));
 
 	auto IrradianceStep = _addIrradianceMultiStep(Resources);
 	auto ScatteringEvalStep = _addScatteringMultiEvalStep(Resources);
 	auto ScatteringAddStep = _addScatteringMultiAddStep(Resources);
 
-	for (uint32_t Order = 0; Order < 5; Order++)
+	for (uint32_t Order = 0; Order < 3; Order++)
 	{
 		m_precomputePasses.push_back(IrradianceStep);
 

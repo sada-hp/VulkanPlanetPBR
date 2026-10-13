@@ -1,21 +1,16 @@
 #include "VulkanAPI/vertex.hpp"
 #include "Factories/VkSamplerFactory.hpp"
+#include "RenderStages/mesh_objects.hpp"
 #include "mesh_material.hpp"
 #include "glm/glm.hpp"
 
 GMeshMaterial::GMeshMaterial(std::shared_ptr<RenderScope> Scope, const MaterialDescriptor& Descriptor)
 	: IMaterial(Scope)
 {
-	RenderPassDescriptor RPDesc{};
-	RPDesc.AddAttachmentLoadOp(RenderScope::GetColorFormat(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-	RPDesc.AddAttachmentClearOp(RenderScope::GetDepthFormat(), VkClearValue{});
-	std::shared_ptr<GVkRenderPass> RenderPass = RPDesc.Construct(Scope);
+	std::shared_ptr<GVkRenderPass> RenderPass = GMeshStage::GetRenderPass(Scope);
 
 	DescriptorLayoutDescriptor DSLDesc{};
 	DSLDesc.AddUniformBuffer(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-	DSLDesc.AddImageSampler(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-	DSLDesc.AddImageSampler(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-	DSLDesc.AddImageSampler(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 	std::shared_ptr<GVkDescriptorSetLayout> Layout = DSLDesc.Construct(Scope);
 
 	GraphicsPipelineDescriptor PSODesc{};

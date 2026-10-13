@@ -45,9 +45,10 @@ ShaderCodeDefinition(GShaderPrecomputeLUT::LUTCommon)
     void UVWToWorldInscatter(vec3 UVW, out float R, out float CosViewZenith, out float CosSunZenith, out float CosViewun)
     {
         const float dHdH = Rt * Rt - Rg * Rg;
+        const float Layer = floor(UVW.z);
 
-        R = UVW.z / (DIM_R - 1.0);
-        R = sqrt(Rg * Rg + R * R * dHdH) + (UVW.z == 0 ? 0.01 : ((UVW.z == DIM_R - 1) ? -0.001 : 0.0));
+        R = Layer / (DIM_R - 1.0);
+        R = sqrt(Rg * Rg + R * R * dHdH) + (Layer == 0 ? 0.01 : ((Layer == DIM_R - 1) ? -0.001 : 0.0));
 
         float x = gl_FragCoord.x - 0.5;
         float y = gl_FragCoord.y - 0.5;

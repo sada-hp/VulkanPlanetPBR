@@ -11,6 +11,7 @@ GCloudsStage::GCloudsStage(std::shared_ptr<RenderScope> Scope, const GVkSharedRe
 	VkExtent2D ExtentLR = { Resources.ColorBuffer->GetExtent().width / 2, Resources.ColorBuffer->GetExtent().height / 2 };
 	Images.CloudsLR = GVkImageFactory::ColorRenderTargetFlight(Scope, ExtentLR);
 	Images.ColorHR = Resources.ColorBuffer;
+	Images.DepthHR = Resources.DepthBuffer;
 
 	RenderPassDescriptor RPDesc{};
 	RPDesc.AddAttachmentClearOp(Images.CloudsLR->GetFormat());

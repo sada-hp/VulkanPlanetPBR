@@ -219,7 +219,7 @@ std::shared_ptr<GVkDescriptorSet> DescriptorSetDescriptor::Allocate(std::shared_
 			VkDescriptorImageInfo descriptorInfo{};
 			descriptorInfo.imageView = view->At(index);
 			descriptorInfo.imageLayout = layout;
-			descriptorInfo.sampler = sampler->GetSampler();
+			descriptorInfo.sampler = sampler.get() ? sampler->GetSampler() : VK_NULL_HANDLE;
 			image_infos.push_back(descriptorInfo);
 
 			write.dstSet = object.set;

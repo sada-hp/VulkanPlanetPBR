@@ -35,7 +35,8 @@ private:
 	GLutPass _addIrradiancePass(GVkSharedResources& Resources);
 	GLutPass _addTransmittancePass(GVkSharedResources& Resources);
 	GLutPass _addIrradianceMultiStep(GVkSharedResources& Resources);
-	GLutPass _addSignleScatteringPass(GVkSharedResources& Resources);
+	GLutPass _addSingleScatteringPass(GVkSharedResources& Resources);
+	GLutPass _addSingleScatteringCopyPass(GVkSharedResources& Resources);
 
 	GLutPass _addScatteringMultiEvalStep(GVkSharedResources& Resources);
 	GLutPass _addScatteringMultiAddStep(GVkSharedResources& Resources);

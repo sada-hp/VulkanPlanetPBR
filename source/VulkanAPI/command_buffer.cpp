@@ -217,7 +217,8 @@ void GVkCommandBuffer::BlitImage(std::shared_ptr<GVkImageView> Source, std::shar
 	BindBarrier<GVkTransferSrcBarrier>(Source);
 	BindBarrier<GVkTransferDstBarrier>(Destination);
 
-	vkCmdBlitImage(object.cmd, Source->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Destination->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageBlit, VK_FILTER_LINEAR);
+	bool IsDepth = Source->GetRoot()->IsDepth();
+	vkCmdBlitImage(object.cmd, Source->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Destination->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageBlit, IsDepth ? VK_FILTER_NEAREST : VK_FILTER_LINEAR);
 
 	object.acquired_resources.emplace_back(Destination);
 	object.acquired_resources.emplace_back(Source);
@@ -314,7 +315,6 @@ void GVkCommandBuffer::BindDescriptorSet(uint32_t Slot, std::shared_ptr<GVkDescr
 	if (Set)
 	{
 		auto& object = _updateRecording();
-
 		assert(object.pipeline);
 
 		vkCmdBindDescriptorSets(object.cmd, object.pipeline->GetBindPoint(), object.pipeline->GetLayout(), Slot, 1, &Set->GetDescriptorSet(), 0, VK_NULL_HANDLE);

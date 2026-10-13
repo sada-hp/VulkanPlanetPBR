@@ -18,7 +18,7 @@ ShaderCodeDefinition(GShaders::TonemapPS)
 
     vec3 FXAA()
     {
-        float FXAA_SPAN_MAX = 16.0;
+        float FXAA_SPAN_MAX = 8.0;
         float FXAA_REDUCE_MUL = 0.125f;
         float FXAA_REDUCE_MIN = 1.0 / 256.0;
 
@@ -72,11 +72,21 @@ ShaderCodeDefinition(GShaders::TonemapPS)
         }
     }
 
+    vec3 toSRGB(vec3 linear)
+    {
+        bvec3 cutoff = lessThan(linear, vec3(0.0031308));
+        vec3 higher = vec3(1.055) * pow(linear, vec3(1.0 / 2.4)) - vec3(0.055);
+        vec3 lower = linear * vec3(12.92);
+        return mix(higher, lower, cutoff);
+    }
+
 	void main()
 	{
 		vec3 HDR = FXAA();
 		vec3 LDR = Tonemap(HDR);
+        vec3 SRGB = toSRGB(LDR);
+        float luma = dot(LDR, vec3(0.2126, 0.7152, 0.0722));
 
-		Color = vec4(LDR, 1.0);
+		Color = vec4(mix(LDR, SRGB, luma), 1.0);
 	}
 );

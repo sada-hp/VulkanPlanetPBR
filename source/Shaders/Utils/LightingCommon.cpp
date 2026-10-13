@@ -20,10 +20,10 @@ ShaderCodeDefinition(GShaderUtils::LightingCommon)
 \n #endif \n
 
     const float HR = 8.0;
-    const float HM = 1.2;
-    const float MieG = 0.76;
+    const float HM = 3.0;
+    const float MieG = 0.65;
 
-    const vec3 BetaMSca = vec3(21e-3);
+    const vec3 BetaMSca = vec3(3e-3);
     const vec3 BetaMEx = BetaMSca / 0.9;
     const vec3 BetaR = vec3(5.8e-3, 1.35e-2, 3.31e-2);
 
@@ -318,8 +318,6 @@ ShaderCodeDefinition(GShaderUtils::LightingCommon)
 
     vec3 SkyScattering(sampler2D TransmittanceLUT, sampler3D InscatteringLUT, vec3 Eye, vec3 View, vec3 Sun)
     {
-        vec3 Color = vec3(0.0);
-
         float Re = length(Eye);
         float EdotV = dot(Eye, View) / Re;
         float EdotL = dot(Eye, Sun) / Re;
@@ -327,11 +325,12 @@ ShaderCodeDefinition(GShaderUtils::LightingCommon)
 
         float PhaseR = RayleighPhase(VdotL);
         float PhaseHGD = HGDPhase(VdotL);
-        vec3 Transmittance = GetTransmittance(TransmittanceLUT, Re, EdotV);
         vec4 Scattering = max(GetInscattering(InscatteringLUT, Re, EdotV, EdotL, VdotL), 0.0);
         Scattering.w *= smoothstep(0.00, 0.02, EdotL);
 
-        Color += max(PhaseR * Scattering.rgb, 0.0) + max(PhaseHGD * GetMie(Scattering), 0.0);
+        vec3 Color = max(PhaseR * Scattering.rgb, 0.0) + max(PhaseHGD * GetMie(Scattering), 0.0);
+
+        vec3 Transmittance = GetTransmittance(TransmittanceLUT, Re, EdotV);
         Color += TWO_PI * Transmittance * vec3(smoothstep(0.99995, 1.0, max(0.0, VdotL)));
 
         return Color * MaxLightIntensity;

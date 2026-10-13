@@ -10,8 +10,6 @@ ShaderCodeDefinition(GShaders::AtmospherePS)
 	layout(binding = 2) uniform sampler3D InscatteringLUT;
 	layout(binding = 3) uniform sampler2D TransmittanceLUT;
 
-	// TODO : use scene depth
-
 	void main()
 	{
 		vec4 frag_pos = vec4(UV * 2.0 - 1.0, 0.0, 1.0);

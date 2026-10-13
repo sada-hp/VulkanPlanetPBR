@@ -9,6 +9,7 @@ class GCloudsStage : public IRenderStage
 	struct
 	{
 		std::shared_ptr<GVkImage> ColorHR = VK_NULL_HANDLE;
+		std::shared_ptr<GVkImage> DepthHR = VK_NULL_HANDLE;
 		std::shared_ptr<GVkImage> CloudsLR = VK_NULL_HANDLE;
 		std::shared_ptr<GVkImage> PerlinWorley = VK_NULL_HANDLE;
 		std::shared_ptr<GVkImage> HighFrequency = VK_NULL_HANDLE;

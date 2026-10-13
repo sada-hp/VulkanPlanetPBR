@@ -23,9 +23,10 @@ ShaderCodeDefinition(GShaders::MeshVS)
 		dvec4 WorldPositionFP64 = Transform.Matrix * dvec4(vertPosition, 1.0);
 		gl_Position = vec4(UBO.view_proj_fl64 * WorldPositionFP64);
 
+		mat4 NormalMatrix = mat4(Transform.Matrix);
+		fragNormal = normalize(transpose(mat3(inverse(NormalMatrix))) * vertNormal);
 		fragPosition = vec3(WorldPositionFP64);
 		fragSubmesh = vertSubmesh;
-		fragNormal = vertNormal;
 		fragUV = vertUV;
 	}
 );
@@ -33,57 +34,69 @@ ShaderCodeDefinition(GShaders::MeshVS)
 ShaderCodeDefinition(GShaders::MeshPS)
 (
 	layout(location = 0) out vec4 Color;
+	layout(location = 1) out vec4 Normal;
+	layout(location = 2) out vec4 Position;
 
 	layout(location = 0) in vec2 UV;
 	layout(location = 1) in flat uint Submesh;
-	layout(location = 2) in vec3 Normal;
+	layout(location = 2) in vec3 VertNormal;
 	layout(location = 3) in vec3 WorldPosition;
 
-	layout(set = 0, binding = 1) uniform sampler2D IrradianceLUT;
-	layout(set = 0, binding = 2) uniform sampler3D InscatteringLUT;
-	layout(set = 0, binding = 3) uniform sampler2D TransmittanceLUT;
 	layout(set = 1, binding = 0) uniform sampler2D Albedo[];
 
 	void main()
 	{
-		float Shade = mix(0.25, 1.0, max(dot(normalize(Normal.xyz), UBO.sun_dir.xyz), 0.0));
 		Color = texture(Albedo[Submesh], UV);
-
-		Color.rgb = pow(Color.rgb, vec3(2.2));
-		Color.rgb *= Shade;
-
-		SAtmosphere Atmosphere;
-		GetAtmosphere(TransmittanceLUT, IrradianceLUT, InscatteringLUT, UBO.eye_pos.xyz, WorldPosition, UBO.sun_dir.xyz, Atmosphere);
-		Color.rgb = Atmosphere.L * Color.rgb + Atmosphere.S;
+		Position = vec4(WorldPosition, 1.0);
+		Normal = vec4(VertNormal, 0.0);
 	}
 );
 
 ShaderCodeDefinition(GShaders::MeshDefaultPS)
 (
 	layout(location = 0) out vec4 Color;
+	layout(location = 1) out vec4 Normal;
+	layout(location = 2) out vec4 Position;
 
 	layout(location = 0) in vec2 UV;
 	layout(location = 1) in flat uint Submesh;
-	layout(location = 2) in vec3 Normal;
+	layout(location = 2) in vec3 VertNormal;
 	layout(location = 3) in vec3 WorldPosition;
+
+	void main()
+	{
+		vec2 Checker = fract(UV) * 2.0 - 1.0;
+		Color.rb = mix(vec2(0.0), vec2(0.5), float(sign(Checker.x) == sign(Checker.y)));
+		Color.ga = vec2(0.0, 1.0);
+		
+		Position = vec4(WorldPosition, 1.0);
+		Normal = vec4(VertNormal, 0.0);
+	}
+);
+
+ShaderCodeDefinition(GShaders::MeshCompositePS)
+(
+	layout(location = 0) out vec4 Color;
+	layout(location = 0) in vec2 UV;
 
 	layout(set = 0, binding = 1) uniform sampler2D IrradianceLUT;
 	layout(set = 0, binding = 2) uniform sampler3D InscatteringLUT;
 	layout(set = 0, binding = 3) uniform sampler2D TransmittanceLUT;
+	layout(input_attachment_index = 0, set = 0, binding = 4) uniform subpassInput inputColor;
+	layout(input_attachment_index = 1, set = 0, binding = 5) uniform subpassInput inputNormal;
+	layout(input_attachment_index = 2, set = 0, binding = 6) uniform subpassInput inputPosition;
 
 	void main()
 	{
-		float Shade = mix(0.25, 1.0, max(dot(normalize(Normal.xyz), UBO.sun_dir.xyz), 0.0));
+		Color = subpassLoad(inputColor);
+		vec3 Position = subpassLoad(inputPosition).xyz;
+		vec3 Normal = normalize(subpassLoad(inputNormal).xyz);
 
-		vec2 Checker = fract(UV) * 2.0 - 1.0;
-		Color.rb = mix(vec2(0.0), vec2(0.5), float(sign(Checker.x) == sign(Checker.y)));
-		Color.ga = vec2(0.0, 1.0);
-
-		Color.rgb = pow(Color.rgb, vec3(2.2));
-		Color.rgb *= Shade;
+		float Shade = mix(0.1, 1.0, max(dot(Normal.xyz, UBO.sun_dir.xyz), 0.0));
+		Color.rgb = Shade * pow(Color.rgb, vec3(1.0 / 2.2));
 
 		SAtmosphere Atmosphere;
-		GetAtmosphere(TransmittanceLUT, IrradianceLUT, InscatteringLUT, UBO.eye_pos.xyz, WorldPosition, UBO.sun_dir.xyz, Atmosphere);
+		GetAtmosphere(TransmittanceLUT, IrradianceLUT, InscatteringLUT, UBO.eye_pos.xyz, Position, UBO.sun_dir.xyz, Atmosphere);
 		Color.rgb = Atmosphere.L * Color.rgb + Atmosphere.S;
 	}
 );

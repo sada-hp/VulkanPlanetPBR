@@ -23,6 +23,7 @@ public:
 	static ShaderCodeType ScatteringGS;
 	static ShaderCodeType TransmittancePS;
 	static ShaderCodeType SingleScatteringPS;
+	static ShaderCodeType CopySingleScatteringPS;
 	static ShaderCodeType MulitScatteringAddPS;
 	static ShaderCodeType IrradianceMultiStepPS;
 	static ShaderCodeType MulitScatteringEvaluatePS;
@@ -44,11 +45,13 @@ public:
 	static ShaderCodeType FullscreenLayeredVS;
 	// Sky
 	static ShaderCodeType AtmospherePS;
+	static ShaderCodeType AerialPerspectivePS;
 	static ShaderCodeType CloudsPS;
 	// Mesh
 	static ShaderCodeType MeshVS;
 	static ShaderCodeType MeshPS;
 	static ShaderCodeType MeshDefaultPS;
+	static ShaderCodeType MeshCompositePS;
 	// Post process
 	static ShaderCodeType TonemapPS;
 };

@@ -200,7 +200,7 @@ RenderPassDescriptor& RenderPassDescriptor::AddSubpass(const GVkSubpassDescripti
 		Subpass.colorReferences.emplace_back(colorIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 	for (auto& inputIndex : SubpassDescription.inputAttachmentsIndices)
-		Subpass.inputReferences.emplace_back(inputIndex, VK_IMAGE_LAYOUT_GENERAL);
+		Subpass.inputReferences.emplace_back(inputIndex, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 	Subpass.depthReference = VkAttachmentReference{ SubpassDescription.depthAttachmentIndex, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
 	Subpass.Index = m_subpasses.size();

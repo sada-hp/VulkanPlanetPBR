@@ -28,19 +28,16 @@ ShaderCodeDefinition(GShaderPrecomputeLUT::SingleScatteringPS)
 
 	layout(location = 0) out vec4 DeltaSR;
 	layout(location = 1) out vec4 DeltaSM;
-	layout(location = 2) out vec4 Scattering;
 
 	layout(binding = 0) uniform sampler2D TransmittanceLUT;
 
     void RayMieIntegrand(float R, float Mu, float MuS, float Nu, float t, out vec3 Ray, out vec3 Mie)
     {
-        Ray = vec3(0.0);
-        Mie = vec3(0.0);
-
         float Ri = sqrt(R * R + t * t + 2.0 * R * Mu * t);
         float MuSi = (Nu * t + MuS * R) / Ri;
-        Ri = clamp(Ri, Rg, Rt);
+        Ri = max(Ri, Rg);
 
+        Ray = vec3(0.0); Mie = vec3(0.0);
         if (MuSi >= -sqrt(1.0 - Rg * Rg / (Ri * Ri)))
         {
             vec3 T = GetTransmittance(TransmittanceLUT, R, Mu, t) * GetTransmittance(TransmittanceLUT, Ri, MuSi);
@@ -51,23 +48,21 @@ ShaderCodeDefinition(GShaderPrecomputeLUT::SingleScatteringPS)
 
     void ComputeDeltaSRDeltaSM(float R, float Mu, float MuS, float Nu, out vec3 Ray, out vec3 Mie)
     {
-        Ray = vec3(0.0);
-        Mie = vec3(0.0);
-
         float Dx = DistanceToAtmosphere(R, Mu) / float(INSCATTERING_SAMPLES);
 
         vec3 Rayi, Miei;
         RayMieIntegrand(R, Mu, MuS, Nu, 0.0, Rayi, Miei);
 
+        Ray = vec3(0.0); Mie = vec3(0.0);
         for (int i = 1; i <= INSCATTERING_SAMPLES; i++)
         {
-            float Xi = float(i) * Dx;
+            float Xj = float(i) * Dx;
 
             vec3 Rayj, Miej;
-            RayMieIntegrand(R, Mu, MuS, Nu, Xi, Rayj, Miej);
+            RayMieIntegrand(R, Mu, MuS, Nu, Xj, Rayj, Miej);
 
-            Ray += (Rayi + Rayj) / 2.0 * Dx;
-            Mie += (Miei + Miej) / 2.0 * Dx;
+            Ray += (Rayi + Rayj) * 0.5 * Dx;
+            Mie += (Miei + Miej) * 0.5 * Dx;
 
             Rayi = Rayj;
             Miei = Miej;
@@ -82,8 +77,7 @@ ShaderCodeDefinition(GShaderPrecomputeLUT::SingleScatteringPS)
         float R, CosViewZenith, CosSunZenith, CosViewun;
         UVWToWorldInscatter(UVW, R, CosViewZenith, CosSunZenith, CosViewun);
 
-        DeltaSR = vec4(0.0); DeltaSM = vec4(0.0); Scattering = vec4(0.0);
+        DeltaSR = vec4(0.0); DeltaSM = vec4(0.0);
         ComputeDeltaSRDeltaSM(R, CosViewZenith, CosSunZenith, CosViewun, DeltaSR.rgb, DeltaSM.rgb);
-        Scattering = vec4(DeltaSR.rgb, DeltaSM.r);
 	}
 );
