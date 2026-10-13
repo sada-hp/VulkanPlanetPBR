@@ -47,6 +47,10 @@ public:
 	static ShaderCodeType AtmospherePS;
 	static ShaderCodeType AerialPerspectivePS;
 	static ShaderCodeType CloudsPS;
+	static ShaderCodeType CloudsCommonPS;
+	static ShaderCodeType CloudsSetupUnderPS;
+	static ShaderCodeType CloudsSetupAbovePS;
+	static ShaderCodeType CloudsSetupBetweenPS;
 	// Mesh
 	static ShaderCodeType MeshVS;
 	static ShaderCodeType MeshPS;

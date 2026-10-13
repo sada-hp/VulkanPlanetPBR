@@ -28,17 +28,56 @@ GCloudsStage::GCloudsStage(std::shared_ptr<RenderScope> Scope, const GVkSharedRe
 	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Images.HighFrequency), GVkSamplerFactory::LinearSamplerRepeat(Scope));
 	DescriptorSet = DSDesc.Allocate(Scope);
 
-	GraphicsPipelineDescriptor PSODesc{};
-	PSODesc.SetRenderPass(RenderPass);
-	PSODesc.AddDescriptorLayout(DescriptorSet->GetLayout());
-	PSODesc.VS.AppendCode(GShaders::FullscreenVS);
-	PSODesc.PS.AppendCode(GShaderUtils::NoiseCommon)
-		.AppendCode(GShaderUtils::LightingCommon)
-		.AppendCode(GShaderUtils::UtilsCommon)
-		.AppendCode(GShaderUtils::UBOCommon)
-		.AppendCode(GShaders::CloudsPS);
+	// under cloud layer
+	{
+		GraphicsPipelineDescriptor PSODesc{};
+		PSODesc.SetRenderPass(RenderPass);
+		PSODesc.AddDescriptorLayout(DescriptorSet->GetLayout());
+		PSODesc.VS.AppendCode(GShaders::FullscreenVS);
+		PSODesc.PS.AppendCode(GShaderUtils::NoiseCommon)
+			.AppendCode(GShaderUtils::LightingCommon)
+			.AppendCode(GShaderUtils::UtilsCommon)
+			.AppendCode(GShaderUtils::UBOCommon)
+			.AppendCode(GShaders::CloudsCommonPS)
+			.AppendCode(GShaders::CloudsSetupUnderPS)
+			.AppendCode(GShaders::CloudsPS);
 
-	Pipeline = PSODesc.Construct(Scope);
+		Pipelines.Under = PSODesc.Construct(Scope);
+	}
+
+	// inside cloud layer
+	{
+		GraphicsPipelineDescriptor PSODesc{};
+		PSODesc.SetRenderPass(RenderPass);
+		PSODesc.AddDescriptorLayout(DescriptorSet->GetLayout());
+		PSODesc.VS.AppendCode(GShaders::FullscreenVS);
+		PSODesc.PS.AppendCode(GShaderUtils::NoiseCommon)
+			.AppendCode(GShaderUtils::LightingCommon)
+			.AppendCode(GShaderUtils::UtilsCommon)
+			.AppendCode(GShaderUtils::UBOCommon)
+			.AppendCode(GShaders::CloudsCommonPS)
+			.AppendCode(GShaders::CloudsSetupBetweenPS)
+			.AppendCode(GShaders::CloudsPS);
+
+		Pipelines.Between = PSODesc.Construct(Scope);
+	}
+
+	// above cloud layer
+	{
+		GraphicsPipelineDescriptor PSODesc{};
+		PSODesc.SetRenderPass(RenderPass);
+		PSODesc.AddDescriptorLayout(DescriptorSet->GetLayout());
+		PSODesc.VS.AppendCode(GShaders::FullscreenVS);
+		PSODesc.PS.AppendCode(GShaderUtils::NoiseCommon)
+			.AppendCode(GShaderUtils::LightingCommon)
+			.AppendCode(GShaderUtils::UtilsCommon)
+			.AppendCode(GShaderUtils::UBOCommon)
+			.AppendCode(GShaders::CloudsCommonPS)
+			.AppendCode(GShaders::CloudsSetupAbovePS)
+			.AppendCode(GShaders::CloudsPS);
+
+		Pipelines.Above = PSODesc.Construct(Scope);
+	}
 }
 
 GCloudsStage::~GCloudsStage()
@@ -101,9 +140,24 @@ std::shared_ptr<GVkImage> GCloudsStage::_generate_noise(const std::string& shade
 
 void GCloudsStage::Execute(const GCamera& Camera, const IWorld& World)
 {
+	// need to connect with shader
+	float Rg = 6360 * 1e3;
+	float Rt = 6420 * 1e3;
+	float BottomBound = Rg + 0.25 * (Rt - Rg);
+	float TopBound    = Rg + 0.60 * (Rt - Rg);
+
 	CommandBuffer->BeginRenderPass(RenderPass, Framebuffer);
-	CommandBuffer->BindPipeline(Pipeline);
+
+	float CameraHeight = glm::length(Camera.GetWorldMatrix().GetPosition());
+	if (CameraHeight < BottomBound)
+		CommandBuffer->BindPipeline(Pipelines.Under);
+	else if (CameraHeight > TopBound)
+		CommandBuffer->BindPipeline(Pipelines.Above);
+	else
+		CommandBuffer->BindPipeline(Pipelines.Between);
+
 	CommandBuffer->BindDescriptorSet(0, DescriptorSet);
+
 	CommandBuffer->Draw(3);
 	CommandBuffer->EndRenderPass();
 

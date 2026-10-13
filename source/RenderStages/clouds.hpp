@@ -15,8 +15,14 @@ class GCloudsStage : public IRenderStage
 		std::shared_ptr<GVkImage> HighFrequency = VK_NULL_HANDLE;
 	} Images;
 
+	struct
+	{
+		std::shared_ptr<GVkPipeline> Under = VK_NULL_HANDLE;
+		std::shared_ptr<GVkPipeline> Between = VK_NULL_HANDLE;
+		std::shared_ptr<GVkPipeline> Above = VK_NULL_HANDLE;
+	} Pipelines;
+
 private:
-	std::shared_ptr<GVkPipeline> Pipeline = VK_NULL_HANDLE;
 	std::shared_ptr<GVkDescriptorSet> DescriptorSet = VK_NULL_HANDLE;
 
 protected:
