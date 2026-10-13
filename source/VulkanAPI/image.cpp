@@ -208,7 +208,7 @@ uint32_t GVkImageView::GetLayerCount() const
 
 uint32_t GVkImageView::GetLevelCount() const
 {
-	if (m_Subresource.layerCount == VK_REMAINING_MIP_LEVELS)
+	if (m_Subresource.levelCount == VK_REMAINING_MIP_LEVELS)
 		return m_Image->GetMipLevelsCount() - m_Subresource.baseMipLevel;
 
 	return m_Subresource.levelCount;

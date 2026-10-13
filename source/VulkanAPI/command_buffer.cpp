@@ -150,6 +150,26 @@ void GVkCommandBuffer::CopyBuffer(std::shared_ptr<GVkBufferView> BufferSrc, std:
 	object.acquired_resources.emplace_back(ImageDst);
 }
 
+void GVkCommandBuffer::GenerateMipMaps(std::shared_ptr<GVkImage> Image)
+{
+	auto& object = _updateRecording();
+
+	uint32_t Layers = Image->GetArrayLayers();
+	uint32_t Levels = Image->GetMipLevelsCount();
+	for (uint32_t layer = 0; layer < Layers; layer++)
+	{
+		for (uint32_t level = 1; level < Levels; level++)
+		{
+			auto prevview = GVkImage::ToView(Image, level - 1, layer, 1, 1);
+			auto nextview = GVkImage::ToView(Image, level, layer, 1, 1);
+			BlitImage(prevview, nextview);
+		}
+	}
+
+	auto view = GVkImage::ToView(Image);
+	BindBarrier<GVkShaderReadBarrier>(view, VK_SHADER_STAGE_FRAGMENT_BIT);
+}
+
 void GVkCommandBuffer::ClearImage(std::shared_ptr<GVkImageView> Image, VkClearColorValue ClearValue)
 {
 	auto& object = _updateRecording();

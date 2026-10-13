@@ -56,12 +56,12 @@ std::shared_ptr<GVkImage> GCloudsStage::_generate_noise(const std::string& shade
 		uint32_t seed;
 	};
 
-	std::shared_ptr<GVkImage> Image = GVkImageFactory::Image(Scope, Format, extents, EImageFlags::Sampler | EImageFlags::RenderTarget);
+	std::shared_ptr<GVkImage> Image = GVkImageFactory::Image(Scope, Format, extents, EImageFlags::TransferSource | EImageFlags::TransferTarget | EImageFlags::Sampler | EImageFlags::AllocateMipMaps | EImageFlags::RenderTarget);
 
 	RenderPassDescriptor RPDesc{};
 	RPDesc.AddAttachmentDontCareOp(Format);
 	std::shared_ptr<GVkRenderPass> _renderPass = RPDesc.Construct(Scope);
-	std::shared_ptr<GVkFramebuffer> _framebuffer = std::make_shared<GVkFramebuffer>(Scope, _renderPass, std::vector{ GVkImage::ToView(Image, extents.depth > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D) });
+	std::shared_ptr<GVkFramebuffer> _framebuffer = std::make_shared<GVkFramebuffer>(Scope, _renderPass, std::vector{ GVkImage::ToView(Image, 0, 0, 1, VK_REMAINING_ARRAY_LAYERS, extents.depth > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D) });
 	
 	GraphicsPipelineDescriptor PSODesc{};
 
@@ -92,6 +92,8 @@ std::shared_ptr<GVkImage> GCloudsStage::_generate_noise(const std::string& shade
 	_commandBuffer->BindPipeline(_pipeline);
 	_commandBuffer->PushConstants(0, _settings);
 	_commandBuffer->Draw(3, extents.depth);
+	_commandBuffer->EndRenderPass();
+	_commandBuffer->GenerateMipMaps(Image);
 	_commandBuffer->Submit();
 
 	return Image;

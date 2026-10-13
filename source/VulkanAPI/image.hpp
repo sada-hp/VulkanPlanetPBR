@@ -79,7 +79,7 @@ public:
 	uint32_t GetMipLevelsCount() const { return m_SubRange.levelCount; };
 	uint32_t GetArrayLayers() const { return m_SubRange.layerCount; };
 
-	VkExtent3D GetExtent(uint32_t Level = 0) const { return VkExtent3D{ m_Extents.width >> Level, m_Extents.height >> Level, m_Extents.depth }; };
+	VkExtent3D GetExtent(uint32_t Level = 0) const { return VkExtent3D{ m_Extents.width >> Level, m_Extents.height >> Level, m_Extents.depth >> Level }; };
 
 	static std::shared_ptr<GVkImageView> ToView(std::shared_ptr<GVkImage> Image, uint32_t Level = 0, uint32_t Layer = 0, uint32_t Levels = VK_REMAINING_MIP_LEVELS, uint32_t Layers = VK_REMAINING_ARRAY_LAYERS, VkImageViewType TypeOverride = VK_IMAGE_VIEW_TYPE_MAX_ENUM);
 	static std::shared_ptr<GVkImageView> ToView(std::shared_ptr<GVkImage> Image, VkImageViewType Type);

@@ -9,8 +9,6 @@ ShaderCodeDefinition(GShaderUtils::LightingCommon)
     const float HALF_PI = PI / 2.0;
     const float TWO_PI = 2 * PI;
 
-    const float MaxLightIntensity = 35.0;
-
 \n #ifndef _ATMO_USE_KILOMETERS \n
     const float Rg = 6360.0 * 1e3;
     const float Rt = 6420.0 * 1e3;
@@ -18,6 +16,9 @@ ShaderCodeDefinition(GShaderUtils::LightingCommon)
     const float Rg = 6360.0;
     const float Rt = 6420.0;
 \n #endif \n
+
+    const float MaxLightIntensity = 35.0;
+    const float Rdelta = Rt - Rg;
 
     const float HR = 8.0;
     const float HM = 3.0;

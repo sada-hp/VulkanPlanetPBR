@@ -84,8 +84,8 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 	layout(binding = 5) uniform sampler3D CloudHighFrequency;
 
 	const float Coverage = 0.5;
-	const float BottomBound = Rg + 0.25 * (Rt - Rg);
-	const float TopBound    = Rg + 0.60 * (Rt - Rg);
+	const float BottomBound = Rg + 0.25 * Rdelta;
+	const float TopBound    = Rg + 0.60 * Rdelta;
 	const float BoundDelta  = TopBound - BottomBound;
 
 	float GetAbsorbtion()
@@ -103,10 +103,10 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 		return saturate((length(pos) - BottomBound) / BoundDelta);
 	}
 
-	float SampleShape(vec3 pos, float heightFraction)
+	float SampleShape(vec3 pos, float heightFraction, float mip)
 	{
 		vec3 sample_uv = GetUV(pos, 15.0);
-		float base_cloud = texture(CloudPerlinWorley, sample_uv).r;
+		float base_cloud = textureLod(CloudPerlinWorley, sample_uv, mip).r;
 
 		float heightInverted = 1.0 - heightFraction;
 
@@ -118,14 +118,14 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 		return saturate(Coverage * remap(base_cloud, shape_mod, 1.0, 0.0, 1.0));
 	}
 
-	float SampleDensity(vec3 pos, float heightFraction)
+	float SampleDensity(vec3 pos, float heightFraction, float mip)
 	{
-		float cloud = SampleShape(pos, heightFraction);
+		float cloud = SampleShape(pos, heightFraction, mip);
 
 		if (cloud != 0.0 || Scattering.a > 1e-2)
 		{
 			vec3 sample_uv = GetUV(pos, 350.0);
-			vec4 high_freq_noise = texture(CloudHighFrequency, sample_uv);
+			vec4 high_freq_noise = textureLod(CloudHighFrequency, sample_uv, mip);
 			float fbm = 0.625 * high_freq_noise.r + 0.25 * high_freq_noise.g + 0.125 * high_freq_noise.b;
 
 			float freq_mod = mix(fbm, 1.0 - fbm, saturate(heightFraction * 15));
@@ -137,22 +137,22 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 		return GetAbsorbtion() * saturate(cloud);
 	}
 
-	float MultiScatter(float phi, float e, float ds)
+	float MultiScatter(float phi, float e)
 	{
 		float luminance = 0.0;
-		float a = 1.0, b = 1.0, c = MieG;
+		float a = 1.0, b = 1.0, c = 1.0;
 		for (int i = 0; i < 5; i++)
 		{
-			luminance += b * HGDPhase(phi, c) * BeerLambert(e * a, ds);
-			a *= 0.5;
-			b *= 0.35;
-			c *= 0.75;
+			luminance += b * HGDPhase(c * phi, c * MieG) * BeerLambert(e * a, 1);
+			a *= 0.75;
+			c *= 0.25;
+			b *= 0.25;
 		}
 
 		return luminance;
 	}
 
-	float SampleCone(vec3 pos, float len)
+	float SampleCone(vec3 pos, float len, float mip)
 	{
 		float cone_density = 0.0;
 		const vec3 dir = UBO.sun_dir.xyz;
@@ -162,10 +162,10 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 			vec3(0.0, 0.0, 0.0),
 			vec3(0.57735, 0.57735, 0.57735),
 			vec3(-0.677686, 0.690636, 0.252514),
-			vec3(0.289651, 0.1549, 0.944515),
+			vec3(0.289651, 0.1549, -0.944515),
 			vec3(0.871223, 0.400051, 0.284481),
-			vec3(0.0914922, 0.494058, 0.864602),
-			vec3(0.488603, 0.531976, 0.691569)
+			vec3(0.0914922, 0.494058, -0.864602),
+			vec3(-0.488603, 0.531976, 0.691569)
 		};
 
 		float ds = len / 6.f;
@@ -174,7 +174,7 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 			vec3 cone_dir = (dir + kernel[i] * float(i)) * ds;
 			pos += cone_dir;
 
-			cone_density += SampleDensity(pos, GetHeight(pos)) * length(cone_dir);
+			cone_density += SampleDensity(pos, GetHeight(pos), mip) * length(cone_dir);
 			ds *= i < 4 ? 1.0 : 2.0;
 		}
 
@@ -186,13 +186,13 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 		return max(ds * smoothstep(0.0, 2.0, w) * 5.3262290811553903259871638305242, 0.1 * ds);
 	}
 
-	vec3 EvaluateLight(vec3 pos, float rdotl)
+	vec3 EvaluateLight(vec3 pos, float rdotl, float base_mip)
 	{
 		const vec3 dir = UBO.sun_dir.xyz;
-		const float len = min(sphere_intersection(pos, dir, vec3(0.0), TopBound), 0.1 * BoundDelta);
+		const float len = min(sphere_intersection(pos, dir, vec3(0.0), TopBound), 0.5 * BoundDelta);
 
-		float density = SampleCone(pos, len);
-		float transmittance = MultiScatter(rdotl, density, 1.0);
+		float density = SampleCone(pos, len, base_mip);
+		float transmittance = MultiScatter(rdotl, density);
 
 		return vec3(MaxLightIntensity * transmittance);
 	}
@@ -208,14 +208,14 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 		for (float i = 0; i < steps; i++)
 		{
 			vec3 temp_pos = ray_pos + ray_dir * ds;
-			sample_density = SampleDensity(temp_pos, GetHeight(temp_pos));
+			sample_density = SampleDensity(temp_pos, GetHeight(temp_pos), 0);
 
 			if (sample_density != 0)
 			{
 				if (found)
 					return true;
 
-				ds = ds / (steps - i);
+				ds = ds / steps;
 				found = true;
 			}
 			else
@@ -231,10 +231,15 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 		const vec3 eye = UBO.eye_pos.xyz;
 		const float Re = length(eye);
 
+		const float distance_to_ray = distance(eye, begin);
+		const float max_distance = sphere_intersection(vec3(0, Rg, 0), vec3(1, 0, 0), vec3(0.0), BottomBound);
+		const float quality_weight = saturate(distance_to_ray / max_distance);
+
+		const float steps = ceil(mix(32.f, 96.f, quality_weight));
+		const float target_mip = max(mix(-4.f, 2.f, quality_weight), 0.0);
+
 		const vec3 eye_n = normalize(eye);
 		const vec3 ray_dir = normalize(end - begin);
-		const float horizon = max(dot(ray_dir, eye_n), 0);
-		const float steps = ceil(mix(96.f, 32.f, horizon));
 
 		const float edotl = saturate(dot(sun_dir, eye) / Re);
 		const float rdotl = saturate(dot(sun_dir, ray_dir));
@@ -261,7 +266,7 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 			height = GetHeight(ray_pos);
 			ray_depth = height * BoundDelta + BottomBound;
 			// sample depth
-			float sample_density = SampleDensity(ray_pos, height);
+			float sample_density = SampleDensity(ray_pos, height, target_mip);
 			if (sample_density > 0.0)
 			{
 				float extinction = sample_density;
@@ -271,7 +276,7 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 				vec3 T = GetTransmittanceWithShadow(TransmittanceLUT, ray_depth, pdotl, Re, edotl);
 				vec3 S = GetAEP(TransmittanceLUT, InscatteringLUT, old_pos, old_depth, ray_pos, ray_depth, ray_dir, sun_dir);
 
-				vec3 E = extinction * EvaluateLight(ray_pos, rdotl);
+				vec3 E = extinction * EvaluateLight(ray_pos, rdotl, target_mip);
 				E = (E - E * transmittance) / extinction;
 
 				Scattering.rgb += Scattering.a * (T * E + S);

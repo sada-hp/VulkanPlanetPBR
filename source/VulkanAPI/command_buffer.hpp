@@ -66,6 +66,7 @@ public:
 	void CopyBuffer(std::shared_ptr<GVkBufferView> BufferSrc, std::shared_ptr<GVkBufferView> BufferDst);
 	void CopyBuffer(std::shared_ptr<GVkBufferView> BufferSrc, std::shared_ptr<GVkImageView> ImageDst);
 
+	void GenerateMipMaps(std::shared_ptr<GVkImage> Image);
 	void ClearImage(std::shared_ptr<GVkImageView> View, VkClearColorValue ClearValue);
 
 	void BeginRenderPass(std::shared_ptr<GVkRenderPass> RenderPass, std::shared_ptr<GVkFramebuffer> Framebuffer);
