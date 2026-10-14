@@ -141,4 +141,45 @@ namespace GVkMeshFactory
 		CalculateNormals(vertices, indices);
 		return Mesh(Scope, vertices, indices);
 	}
+
+	inline std::shared_ptr<IMesh> QuadrilateralSphere(std::shared_ptr<RenderScope> Scope, float Radius, uint32_t subdivisions = 16u)
+	{
+		std::vector<MeshVertex> vertices = {}; std::vector<uint32_t> indices = {};
+
+		double dxy = 1.f / static_cast<float>(subdivisions);
+		auto generateFace = [&](float p, float y, float r)
+		{
+			glm::quat rot = glm::vec3(glm::radians(p), glm::radians(y), glm::radians(r));
+
+			std::vector<uint32_t> face_indices = GenerateQuadIndices(subdivisions, subdivisions, vertices.size());
+			indices.insert(indices.end(), face_indices.begin(), face_indices.end());
+
+			for (uint32_t y = 0; y <= subdivisions; y++)
+			{
+				for (uint32_t x = 0; x <= subdivisions; x++)
+				{
+					MeshVertex vertex{};
+					vertex.position = Radius * glm::normalize(rot * glm::vec3{ x * dxy - 0.5, 0.5, y * dxy - 0.5 });
+					vertex.uv = { x * dxy, y * dxy };
+					vertices.push_back(vertex);
+				}
+			}
+		};
+
+		// top
+		generateFace(0.0, 0.0, 0.0);
+		// bottom
+		generateFace(180.0, 0.0, 0.0);
+		// front
+		generateFace(90.0, 0.0, 0.0);
+		// back
+		generateFace(-90.0, 0.0, 0.0);
+		// side
+		generateFace(0.0, 0.0, 90.0);
+		// other side
+		generateFace(0.0, 0.0, -90.0);
+
+		CalculateNormals(vertices, indices);
+		return Mesh(Scope, vertices, indices);
+	}
 };

@@ -30,6 +30,9 @@ namespace GEllipsoid
 	template<typename T>
 	glm::mat<3, 3, T> EulerFromCartesian(glm::vec<3, T> offset)
 	{
+		if (offset == glm::vec<3, T>(0.0))
+			return glm::mat<3, 3, T>(1.0);
+
 		glm::vec<3, T> up = glm::normalize(offset);
 		glm::qua<T> orientation = glm::rotation(glm::vec<3, T>(0, 1, 0), up);
 		return glm::mat3_cast(orientation);
@@ -56,7 +59,7 @@ namespace GEllipsoid
 		glm::vec<4, T> Out = glm::vec<4, T>(0, 0, 0, Rg);
 
 		Out.x = glm::degrees(glm::atan(offset.z, offset.x));
-		Out.y = glm::degrees(glm::asin(glm::clamp(0.0, 1.0, offset.y / Rg)));
+		Out.y = glm::degrees(glm::pi<float>() * 0.5 - glm::atan(glm::sqrt(offset.x * offset.x + offset.z * offset.z), offset.y));
 		Out.z = glm::length(offset) - Rg;
 
 		return Out;

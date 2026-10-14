@@ -25,6 +25,11 @@ public:
 	std::shared_ptr<GVkBuffer> IndexBuffer() const { return m_IndexBuffer; }
 	VkIndexType IndexType() const { return m_IndexType; }
 	uint32_t IndexCount() const { return m_IndexCount; }
+
+	std::shared_ptr<RenderScope> GetScope() const
+	{
+		return Scope;
+	}
 };
 
 template<typename VertexType> 

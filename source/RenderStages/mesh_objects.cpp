@@ -74,25 +74,28 @@ void GMeshStage::Execute(const GCamera& Camera, const IWorld& World)
 
 	for (auto& [object, matrix] : objects)
 	{
-		CommandBuffer->BindPipeline(object->Material->GetPipeline());
-		CommandBuffer->BindDescriptorSet(0, Descriptors.Draw);
-
 		CommandBuffer->BindVertexBuffer(0, GVkBuffer::ToView(object->Mesh->VertexBuffer()));
 
-		glm::dmat4 WorldMatrix = matrix->GetMatrix<double>();
-		CommandBuffer->PushConstants(0, WorldMatrix);
+		bool IsIndexed = object->Mesh->IndexCount() > 0;
 
-		if (object->Material->GetDescriptorSet())
-			CommandBuffer->BindDescriptorSet(1, object->Material->GetDescriptorSet());
-
-		if (object->Mesh->IndexCount() > 0)
-		{
+		if (IsIndexed)
 			CommandBuffer->BindIndexBuffer(object->Mesh->IndexType(), GVkBuffer::ToView(object->Mesh->IndexBuffer()));
-			CommandBuffer->DrawIndexed(object->Mesh->IndexCount());
-		}
-		else
+
+		for (auto& material : object->Materials)
 		{
-			CommandBuffer->Draw(object->Mesh->VertexCount());
+			CommandBuffer->BindPipeline(material->GetPipeline());
+			CommandBuffer->BindDescriptorSet(0, Descriptors.Draw);
+
+			if (auto descriptorset = material->GetDescriptorSet())
+				CommandBuffer->BindDescriptorSet(1, descriptorset);
+
+			glm::dmat4 WorldMatrix = matrix->GetMatrix<double>();
+			CommandBuffer->PushConstants(0, WorldMatrix);
+
+			if (IsIndexed)
+				CommandBuffer->DrawIndexed(object->Mesh->IndexCount());
+			else
+				CommandBuffer->Draw(object->Mesh->VertexCount());
 		}
 	}
 
