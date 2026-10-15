@@ -5,8 +5,8 @@
 GCloudsStage::GCloudsStage(std::shared_ptr<RenderScope> Scope, const GVkSharedResources& Resources)
 	: IRenderStage(Scope, VK_QUEUE_GRAPHICS_BIT)
 {
-	Images.PerlinWorley = _generate_noise(GShaderNoise::PerlinWorleyPS, VK_FORMAT_R32_SFLOAT, VkExtent3D{ 128, 128, 128 }, 8, 5);
-	Images.HighFrequency = _generate_noise(GShaderNoise::WorleyPS, VK_FORMAT_R32G32B32A32_SFLOAT, VkExtent3D{ 64, 64, 64 }, 6, 3);
+	Images.PerlinWorley = _generate_noise(GShaderNoise::PerlinWorleyPS, VK_FORMAT_R16_SFLOAT, VkExtent3D{ 128, 128, 128 }, 8, 5);
+	Images.HighFrequency = _generate_noise(GShaderNoise::WorleyPS, VK_FORMAT_R16G16B16A16_SFLOAT, VkExtent3D{ 64, 64, 64 }, 6, 3);
 
 	VkExtent2D ExtentLR = { Resources.ColorBuffer->GetExtent().width / 2, Resources.ColorBuffer->GetExtent().height / 2 };
 	Images.CloudsLR = GVkImageFactory::ColorRenderTargetFlight(Scope, ExtentLR);

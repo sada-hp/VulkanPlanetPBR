@@ -207,7 +207,7 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 			pos += cone_dir;
 
 			cone_density += SampleDensity(pos, GetHeight(pos), mip) * length(cone_dir);
-			ds *= i < 4 ? 1.0 : 2.0;
+			ds *= i < 4 ? 1.0 : 4.0;
 		}
 
 		return GetAbsorbtion() * cone_density;
@@ -235,8 +235,8 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 		const vec3 eye = UBO.eye_pos.xyz;
 		const float Re = length(eye);
 
-		const float distance_to_ray = distance(eye, begin);
 		const float ray_length = distance(begin, end);
+		const float distance_to_ray = distance(eye, begin);
 		const float max_distance = sphere_intersection(vec3(0, Rg, 0), vec3(1, 0, 0), vec3(0.0), BottomBound);
 
 		const float steps_weight = saturate(ray_length / (3.0 * BoundDelta));

@@ -9,6 +9,7 @@
 #include "RenderStages/mesh_objects.hpp"
 #include "RenderStages/tonemapping.hpp"
 #include "RenderStages/atmosphere.hpp"
+#include "RenderStages/clear_pass.hpp"
 #include "RenderStages/clouds.hpp"
 
 GVulkanBase::GVulkanBase(GLFWwindow* window)
@@ -27,6 +28,7 @@ GVulkanBase::GVulkanBase(GLFWwindow* window)
 	GAtmospherePrecomputeLUT::Execute(m_Scope, m_Resources);
 
 	// render stages
+	AddRenderStage<GAttachmentsClear>();
 	AddRenderStage<GCloudsStage>();
 	AddRenderStage<GMeshStage>();
 	AddRenderStage<GAtmosphereStage>();
