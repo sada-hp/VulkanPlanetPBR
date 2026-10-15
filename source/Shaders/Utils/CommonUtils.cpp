@@ -80,8 +80,8 @@ ShaderCodeDefinition(GShaderUtils::UtilsCommon)
         t.x = mix(max((-b - sqrt(discr)) / 2, 0.0), 0.0, float(discr < 0.0));
         t.y = mix(max((-b + sqrt(discr)) / 2, 0.0), 0.0, float(discr < 0.0));
 
-        t.x = mix(t.x, Invalid, float(t.x == 0.0));
-        t.y = mix(t.y, Invalid, float(t.y == 0.0));
+        t.x = mix(t.x, Invalid, float(t.x <= 0.0));
+        t.y = mix(t.y, Invalid, float(t.y <= 0.0));
 
         return t;
     }

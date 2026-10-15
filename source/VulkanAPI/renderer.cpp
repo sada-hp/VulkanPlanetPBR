@@ -46,16 +46,18 @@ bool GVulkanBase::Draw(const GCamera& Camera, const IWorld& World)
 		float Aspect = static_cast<float>(m_Swapchain->GetExtent().width) / static_cast<float>(m_Swapchain->GetExtent().height);
 		const_cast<GCamera&>(Camera).GetProjectionMatrix().SetAspect(Aspect);
 
+		glm::dvec3 pos = Camera.GetWorldMatrix().GetPosition();
 		glm::dmat4 view  = Camera.ViewMat4();
 		glm::dmat4 world = Camera.WorldMat4();
 		glm::dmat4 proj  = Camera.ProjectionMat4();
+		glm::mat4 basis = glm::mat4(glm::mat3(view));
 
 		_UniformBuffer UBO{};
-		UBO.view_proj_fl64 = proj * view;
-		UBO.view_proj = UBO.view_proj_fl64;
+		UBO.view_proj = proj * view;
+		UBO.view_proj_no_offset = glm::mat4(proj) * basis;
 		UBO.view_proj_inv = glm::inverse(view) * glm::inverse(proj);
 		UBO.sun_dir = glm::vec4(World.GetSunDirection(), 0.0);
-		UBO.eye_pos = glm::vec4(Camera.GetWorldMatrix().GetPosition(), 1.0);
+		UBO.eye_pos = glm::vec4(pos, 1.0);
 		UBO.time = glfwGetTime();
 
 		memcpy(m_Resources.UBO->Map(), &UBO, sizeof(UBO));

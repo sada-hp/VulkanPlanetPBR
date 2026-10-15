@@ -72,11 +72,17 @@ void GMeshStage::Execute(const GCamera& Camera, const IWorld& World)
 	std::vector<std::pair<const GDrawable*, const EllipsoidMatrix*>> objects;
 	World.GetDrawableObjects(objects);
 
+	glm::dvec3 CameraOffset = Camera.GetWorldMatrix().GetPosition();
 	for (auto& [object, matrix] : objects)
 	{
-		CommandBuffer->BindVertexBuffer(0, GVkBuffer::ToView(object->Mesh->VertexBuffer()));
-
+		/*
+		* Preprocess world matrix on CPU to avoid FP64 math on GPU
+		*/
+		glm::dmat4 WorldMatrix = matrix->GetMatrix<double>();
+		glm::mat4 CompressedMatrix = glm::translate(WorldMatrix, -CameraOffset);
 		bool IsIndexed = object->Mesh->IndexCount() > 0;
+
+		CommandBuffer->BindVertexBuffer(0, GVkBuffer::ToView(object->Mesh->VertexBuffer()));
 
 		if (IsIndexed)
 			CommandBuffer->BindIndexBuffer(object->Mesh->IndexType(), GVkBuffer::ToView(object->Mesh->IndexBuffer()));
@@ -89,8 +95,7 @@ void GMeshStage::Execute(const GCamera& Camera, const IWorld& World)
 			if (auto descriptorset = material->GetDescriptorSet())
 				CommandBuffer->BindDescriptorSet(1, descriptorset);
 
-			glm::dmat4 WorldMatrix = matrix->GetMatrix<double>();
-			CommandBuffer->PushConstants(0, WorldMatrix);
+			CommandBuffer->PushConstants(0, CompressedMatrix);
 
 			if (IsIndexed)
 				CommandBuffer->DrawIndexed(object->Mesh->IndexCount());

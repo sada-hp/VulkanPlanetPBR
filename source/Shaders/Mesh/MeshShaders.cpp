@@ -4,7 +4,7 @@ ShaderCodeDefinition(GShaders::MeshVS)
 (
 	layout(push_constant) uniform constants
 	{
-		layout(offset = 0) dmat4 Matrix;
+		layout(offset = 0) mat4 Matrix;
 	} Transform;
 
 	layout(location = 0) in vec3 vertPosition;
@@ -20,12 +20,14 @@ ShaderCodeDefinition(GShaders::MeshVS)
 
 	void main()
 	{
-		dvec4 WorldPositionFP64 = Transform.Matrix * dvec4(vertPosition, 1.0);
-		gl_Position = vec4(UBO.view_proj_fl64 * WorldPositionFP64);
+		mat4 Matrix = Transform.Matrix;
 
-		mat4 NormalMatrix = mat4(Transform.Matrix);
-		fragNormal = normalize(transpose(mat3(inverse(NormalMatrix))) * vertNormal);
-		fragPosition = vec3(WorldPositionFP64);
+		vec4 WorldPosition = Matrix * vec4(vertPosition, 1.0);
+		gl_Position = vec4(UBO.view_proj_no_offset * WorldPosition);
+
+		mat3 NormalMatrix = mat3(Matrix);
+		fragNormal = normalize(NormalMatrix * vertNormal);
+		fragPosition = WorldPosition.xyz + UBO.eye_pos.xyz;
 		fragSubmesh = vertSubmesh;
 		fragUV = vertUV;
 	}

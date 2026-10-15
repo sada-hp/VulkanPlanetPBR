@@ -54,7 +54,6 @@ bool RenderScope::_createLogicalDevice(VkPhysicalDevice physicalDevice, const st
 
 	if (availableFeatures.features.imageCubeArray                       != VK_TRUE ||
 		availableFeatures.features.fullDrawIndexUint32                  != VK_TRUE ||
-		availableFeatures.features.shaderFloat64                        != VK_TRUE ||
 		availableFeatures.features.samplerAnisotropy                    != VK_TRUE ||
 		availableFeatures.features.independentBlend                     != VK_TRUE ||
 		availableFeatures.features.fillModeNonSolid                     != VK_TRUE ||
@@ -79,7 +78,6 @@ bool RenderScope::_createLogicalDevice(VkPhysicalDevice physicalDevice, const st
 	VkPhysicalDeviceFeatures deviceFeatures{};
 	deviceFeatures.imageCubeArray = VK_TRUE;
 	deviceFeatures.fullDrawIndexUint32 = VK_TRUE;
-	deviceFeatures.shaderFloat64 = VK_TRUE;
 	deviceFeatures.samplerAnisotropy = VK_TRUE;
 	deviceFeatures.independentBlend = VK_TRUE;
 	deviceFeatures.fillModeNonSolid = VK_TRUE;

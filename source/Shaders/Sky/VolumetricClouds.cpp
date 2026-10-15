@@ -309,7 +309,9 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 
 		vec3 ray_origin, ray_end;
 		if (get_ray(eye_pos, ray_dir, ray_origin, ray_end))
+		{
 			MarchToCloud(ray_origin, ray_end);
+		}
 	}
 );
 
@@ -334,8 +336,10 @@ ShaderCodeDefinition(GShaders::CloudsSetupBetweenPS)
 	{
 		float db = sphere_intersection(eye, dir, vec3(0.0), BottomBound);
 		float dt = sphere_intersection(eye, dir, vec3(0.0), TopBound);
+		float dg = sphere_intersection(eye, dir, vec3(0.0), Rg);
 
-		ray_end = eye + dir * min(dt, db);
+		bool groundVisible = dg != Invalid;
+		ray_end = eye + dir * mix(dt, db, float(groundVisible));
 		ray_origin = eye;
 
 		return SearchCloud(ray_origin, ray_end);
@@ -348,11 +352,13 @@ ShaderCodeDefinition(GShaders::CloudsSetupAbovePS)
 	{
 		float db = sphere_intersection(eye, dir, vec3(0.0), BottomBound);
 		vec2 dt = sphere_intersections(eye, dir, vec3(0.0), TopBound);
+		float dg = sphere_intersection(eye, dir, vec3(0.0), Rg);
 
 		float dt_min = min(dt.x, dt.y);
 		float dt_max = max(dt.x, dt.y);
+		float dt_bot = min(db, dg);
 
-		ray_end = eye + dir * min(db, dt_max);
+		ray_end = eye + dir * min(dt_bot, dt_max);
 		ray_origin = eye + dir * dt_min;
 
 		return (dt.x != Invalid || dt.y != Invalid) && SearchCloud(ray_origin, ray_end);
