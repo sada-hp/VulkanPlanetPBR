@@ -38,8 +38,8 @@ public:
 	inline static std::shared_ptr<GVkRenderPass> GetRenderPass(std::shared_ptr<RenderScope> Scope)
 	{
 		RenderPassDescriptor RPDesc{};
-		/* 0 */ RPDesc.AddAttachmentClearOp(VK_FORMAT_R32G32B32A32_SFLOAT);
-		/* 1 */ RPDesc.AddAttachmentClearOp(VK_FORMAT_R32G32B32A32_SFLOAT);
+		/* 0 */ RPDesc.AddAttachmentClearOp(VK_FORMAT_R16G16B16A16_SFLOAT);
+		/* 1 */ RPDesc.AddAttachmentClearOp(VK_FORMAT_R16G16B16A16_SFLOAT);
 		/* 2 */ RPDesc.AddAttachmentClearOp(VK_FORMAT_R32G32B32A32_SFLOAT);
 		/* 3 */ RPDesc.AddAttachmentLoadOp(RenderScope::GetColorFormat(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 		/* 4 */ RPDesc.AddAttachmentClearOp(RenderScope::GetDepthFormat(), VkClearValue{ .depthStencil = { 0.f, 0 } });

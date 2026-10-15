@@ -68,6 +68,26 @@ void GVkSwapchain::_createSwapchain()
 			}
 		}
 
+		uint32_t presentModesCount = 0;
+		std::vector<VkPresentModeKHR> presentModes = {};
+		vkGetPhysicalDeviceSurfacePresentModesKHR(Scope->GetPhysicalDevice(), m_Surface, &presentModesCount, nullptr);
+		presentModes.resize(presentModesCount);
+		vkGetPhysicalDeviceSurfacePresentModesKHR(Scope->GetPhysicalDevice(), m_Surface, &presentModesCount, presentModes.data());
+
+		VkPresentModeKHR presentMode = presentModes.front();
+		for (auto& candidateMode : presentModes)
+		{
+			if (candidateMode == VK_PRESENT_MODE_MAILBOX_KHR)
+			{
+				presentMode = candidateMode;
+				break;
+			}
+			else if (candidateMode == VK_PRESENT_MODE_FIFO_KHR)
+			{
+				presentMode = candidateMode;
+			}
+		}
+
 		VkSwapchainCreateInfoKHR createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 		createInfo.minImageCount = std::clamp(Scope->GetMaxFramesInFlight(), capabilities.minImageCount, capabilities.maxImageCount);
@@ -78,11 +98,7 @@ void GVkSwapchain::_createSwapchain()
 		createInfo.imageArrayLayers = 1;
 		createInfo.surface = m_Surface;
 		createInfo.clipped = VK_TRUE;
-#ifndef FORCE_VSYNC
-		createInfo.presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
-#else
-		createInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
-#endif
+		createInfo.presentMode = presentMode;
 		createInfo.imageFormat = surfaceFormat.format;
 		createInfo.imageExtent = capabilities.currentExtent;
 		createInfo.imageColorSpace = surfaceFormat.colorSpace;

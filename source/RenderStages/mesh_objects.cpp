@@ -5,8 +5,8 @@
 GMeshStage::GMeshStage(std::shared_ptr<RenderScope> Scope, const GVkSharedResources& Resources)
 	: IRenderStage(Scope, VK_QUEUE_GRAPHICS_BIT)
 {
-	Images.DeferredColor = GVkImageFactory::Image(Scope, VK_FORMAT_R32G32B32A32_SFLOAT, Resources.ColorBuffer->GetExtent(), EImageFlags::RenderTarget | EImageFlags::SubpassInput | EImageFlags::InFlight);
-	Images.DeferredNormal = GVkImageFactory::Image(Scope, VK_FORMAT_R32G32B32A32_SFLOAT, Resources.ColorBuffer->GetExtent(), EImageFlags::RenderTarget | EImageFlags::SubpassInput | EImageFlags::InFlight);
+	Images.DeferredColor = GVkImageFactory::Image(Scope, VK_FORMAT_R16G16B16A16_SFLOAT, Resources.ColorBuffer->GetExtent(), EImageFlags::RenderTarget | EImageFlags::SubpassInput | EImageFlags::InFlight);
+	Images.DeferredNormal = GVkImageFactory::Image(Scope, VK_FORMAT_R16G16B16A16_SFLOAT, Resources.ColorBuffer->GetExtent(), EImageFlags::RenderTarget | EImageFlags::SubpassInput | EImageFlags::InFlight);
 	Images.DeferredPosition = GVkImageFactory::Image(Scope, VK_FORMAT_R32G32B32A32_SFLOAT, Resources.ColorBuffer->GetExtent(), EImageFlags::RenderTarget | EImageFlags::SubpassInput | EImageFlags::InFlight);
 
 	RenderPass = GetRenderPass(Scope);
