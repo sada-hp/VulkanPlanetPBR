@@ -105,23 +105,15 @@ const VkImage& GVkImage::GetImage() const
 	return object.image;
 }
 
-const GVkImageState& GVkImage::_getImageState(uint32_t Level, uint32_t Layer) const
+const GVkImageState& GVkImage::_getImageState(uint32_t Index, uint32_t Level, uint32_t Layer) const
 {
-	auto& object = _activeObj();
+	auto& object = m_flightResources[Index];
 	return object.layouts[Layer][Level];
 }
 
-void GVkImage::_setImageState(uint32_t Level, uint32_t Layer, VkImageLayout Layout, VkPipelineStageFlags Stage, VkAccessFlags Access)
+void GVkImage::_setImageState(uint32_t Index, const VkImageSubresourceRange& Range, VkImageLayout Layout, VkPipelineStageFlags Stage, VkAccessFlags Access)
 {
-	auto& object = _activeObj();
-	object.layouts[Layer][Level].layout = Layout;
-	object.layouts[Layer][Level].access = Access;
-	object.layouts[Layer][Level].stage = Stage;
-}
-
-void GVkImage::_setImageState(const VkImageSubresourceRange& Range, VkImageLayout Layout, VkPipelineStageFlags Stage, VkAccessFlags Access)
-{
-	auto& object = _activeObj();
+	auto& object = m_flightResources[Index];
 
 	uint32_t BaseLevel = Range.baseMipLevel;
 	uint32_t LevelCount = Range.levelCount == VK_REMAINING_MIP_LEVELS ? GetMipLevelsCount() - BaseLevel : Range.levelCount;
@@ -140,11 +132,17 @@ void GVkImage::_setImageState(const VkImageSubresourceRange& Range, VkImageLayou
 	}
 }
 
+size_t GVkImage::GetAllocSize() const
+{
+	auto& object = _activeObj();
+
+	VmaAllocationInfo info{};
+	vmaGetAllocationInfo(Scope->GetAllocator(), object.memory, &info);
+	return info.size;
+}
+
 std::shared_ptr<GVkImageView> GVkImage::ToView(std::shared_ptr<GVkImage> Image, uint32_t Level, uint32_t Layer, uint32_t Levels, uint32_t Layers, VkImageViewType TypeOverride)
 {
-	if (TypeOverride == VK_IMAGE_VIEW_TYPE_MAX_ENUM)
-		TypeOverride = Image->GetImageType() & VK_IMAGE_TYPE_3D ? VK_IMAGE_VIEW_TYPE_3D : (Image->GetArrayLayers() > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D);
-
 	return std::make_shared<GVkImageView>(Image, VkImageSubresourceRange(Image->GetAspect(), Level, Levels, Layer, Layers), TypeOverride);
 }
 
@@ -157,24 +155,36 @@ std::shared_ptr<GVkImageView> GVkImage::ToView(std::shared_ptr<GVkImage> Image, 
 	return std::make_shared<GVkImageView>(Image, Range, Type);
 }
 
-GVkImageView::GVkImageView(std::shared_ptr<GVkImage> Image, VkImageSubresourceRange Range, VkImageViewType Type)
+std::shared_ptr<GVkImageView> GVkImage::ToFlightHadle(std::shared_ptr<GVkImage> Image, int32_t shuffle_offset)
+{
+	VkImageSubresourceRange Range = Image->m_SubRange;
+	Range.layerCount = VK_REMAINING_ARRAY_LAYERS;
+	Range.levelCount = VK_REMAINING_MIP_LEVELS;
+
+	return std::make_shared<GVkImageView>(Image, Range, VK_IMAGE_VIEW_TYPE_MAX_ENUM, shuffle_offset);
+}
+
+GVkImageView::GVkImageView(std::shared_ptr<GVkImage> Image, VkImageSubresourceRange Range, VkImageViewType Type, int32_t shuffle)
 	: m_Image(Image)
 	, m_type(Type)
+	, m_shuffle(shuffle)
 {
 	m_Subresource = Range;
+	m_flightResources.resize(Image->m_flightResources.size());
+
+	if (m_type == VK_IMAGE_VIEW_TYPE_MAX_ENUM)
+		m_type = Image->GetImageType() & VK_IMAGE_TYPE_3D ? VK_IMAGE_VIEW_TYPE_3D : (Image->GetArrayLayers() > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D);
 
 	VkImageViewCreateInfo viewCreateInfo{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+	viewCreateInfo.subresourceRange = m_Subresource;
 	viewCreateInfo.format = Image->GetFormat();
-	viewCreateInfo.subresourceRange = Range;
-	viewCreateInfo.viewType = Type;
+	viewCreateInfo.viewType = m_type;
 
-	uint32_t index = 0;
-	m_flightResources.resize(Image->m_flightResources.size());
+	int32_t index = 0;
 	for (auto& object : m_flightResources)
 	{
 		viewCreateInfo.image = Image->At(index);
 		vkCreateImageView(m_Image->Scope->GetDevice(), &viewCreateInfo, VK_NULL_HANDLE, &object.view);
-
 		index++;
 	}
 }
@@ -189,7 +199,12 @@ GVkImageView::~GVkImageView()
 
 void GVkImageView::_setImageState(VkImageLayout Layout, VkPipelineStageFlags Stage, VkAccessFlags Access)
 {
-	m_Image->_setImageState(m_Subresource, Layout, Stage, Access);
+	m_Image->_setImageState(_activeIndex(), m_Subresource, Layout, Stage, Access);
+}
+
+const GVkImageState& GVkImageView::_getImageState(uint32_t Level, uint32_t Layer)
+{
+	return m_Image->_getImageState(_activeIndex(), Level, Layer);
 }
 
 uint32_t GVkImageView::GetLayerCount() const

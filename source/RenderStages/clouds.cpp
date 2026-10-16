@@ -10,14 +10,16 @@ GCloudsStage::GCloudsStage(std::shared_ptr<RenderScope> Scope, const GVkSharedRe
 
 	VkExtent2D ExtentLR = { Resources.ColorBuffer->GetExtent().width / 2, Resources.ColorBuffer->GetExtent().height / 2 };
 	Images.CloudsLR = GVkImageFactory::ColorRenderTargetFlight(Scope, ExtentLR);
+	Images.DepthLR = GVkImageFactory::DepthRenderTargetFlight(Scope, ExtentLR);
 	Images.ColorHR = Resources.ColorBuffer;
 	Images.DepthHR = Resources.DepthBuffer;
 
 	RenderPassDescriptor RPDesc{};
-	RPDesc.AddAttachmentClearOp(Images.CloudsLR->GetFormat());
+	RPDesc.AddAttachmentClearOp(Images.CloudsLR->GetFormat(), VkClearValue{}, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+	RPDesc.AddAttachmentClearOp(Images.DepthLR->GetFormat());
 	RenderPass = RPDesc.Construct(Scope);
 
-	Framebuffer = std::make_shared<GVkFramebuffer>(Scope, RenderPass, std::vector{ Images.CloudsLR });
+	Framebuffer = std::make_shared<GVkFramebuffer>(Scope, RenderPass, std::vector{ Images.CloudsLR, Images.DepthLR });
 
 	DescriptorSetDescriptor DSDesc{};
 	DSDesc.AddUniformBuffer(VK_SHADER_STAGE_FRAGMENT_BIT, GVkBuffer::ToView(Resources.UBO));
@@ -26,12 +28,15 @@ GCloudsStage::GCloudsStage(std::shared_ptr<RenderScope> Scope, const GVkSharedRe
 	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Resources.TransmittanceLUT), GVkSamplerFactory::LinearSamplerRepeat(Scope));
 	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Images.PerlinWorley), GVkSamplerFactory::LinearSamplerRepeat(Scope));
 	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Images.HighFrequency), GVkSamplerFactory::LinearSamplerRepeat(Scope));
+	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToFlightHadle(Images.CloudsLR, -1), GVkSamplerFactory::PointSamplerClamp(Scope));
+	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToFlightHadle(Images.DepthLR, -1), GVkSamplerFactory::PointSamplerClamp(Scope));
 	DescriptorSet = DSDesc.Allocate(Scope);
 
 	// under cloud layer
 	{
 		GraphicsPipelineDescriptor PSODesc{};
 		PSODesc.SetRenderPass(RenderPass);
+		PSODesc.AddPushConstants<int>(VK_SHADER_STAGE_FRAGMENT_BIT);
 		PSODesc.AddDescriptorLayout(DescriptorSet->GetLayout());
 		PSODesc.VS.AppendCode(GShaders::FullscreenVS);
 		PSODesc.PS.AppendCode(GShaderUtils::NoiseCommon)
@@ -49,6 +54,7 @@ GCloudsStage::GCloudsStage(std::shared_ptr<RenderScope> Scope, const GVkSharedRe
 	{
 		GraphicsPipelineDescriptor PSODesc{};
 		PSODesc.SetRenderPass(RenderPass);
+		PSODesc.AddPushConstants<int>(VK_SHADER_STAGE_FRAGMENT_BIT);
 		PSODesc.AddDescriptorLayout(DescriptorSet->GetLayout());
 		PSODesc.VS.AppendCode(GShaders::FullscreenVS);
 		PSODesc.PS.AppendCode(GShaderUtils::NoiseCommon)
@@ -66,6 +72,7 @@ GCloudsStage::GCloudsStage(std::shared_ptr<RenderScope> Scope, const GVkSharedRe
 	{
 		GraphicsPipelineDescriptor PSODesc{};
 		PSODesc.SetRenderPass(RenderPass);
+		PSODesc.AddPushConstants<int>(VK_SHADER_STAGE_FRAGMENT_BIT);
 		PSODesc.AddDescriptorLayout(DescriptorSet->GetLayout());
 		PSODesc.VS.AppendCode(GShaders::FullscreenVS);
 		PSODesc.PS.AppendCode(GShaderUtils::NoiseCommon)
@@ -140,6 +147,8 @@ std::shared_ptr<GVkImage> GCloudsStage::_generate_noise(const std::string& shade
 
 void GCloudsStage::Execute(const GCamera& Camera, const IWorld& World)
 {
+	static int Order = 0;
+
 	// need to connect with shader
 	float Rg = 6360 * 1e3;
 	float Rt = 6420 * 1e3;
@@ -149,6 +158,7 @@ void GCloudsStage::Execute(const GCamera& Camera, const IWorld& World)
 	CommandBuffer->BeginRenderPass(RenderPass, Framebuffer);
 
 	float CameraHeight = glm::length(Camera.GetWorldMatrix().GetPosition());
+
 	if (CameraHeight < BottomBound)
 		CommandBuffer->BindPipeline(Pipelines.Under);
 	else if (CameraHeight > TopBound)
@@ -157,10 +167,15 @@ void GCloudsStage::Execute(const GCamera& Camera, const IWorld& World)
 		CommandBuffer->BindPipeline(Pipelines.Between);
 
 	CommandBuffer->BindDescriptorSet(0, DescriptorSet);
+	CommandBuffer->PushConstants(0, Order);
 
 	CommandBuffer->Draw(3);
 	CommandBuffer->EndRenderPass();
 
-	CommandBuffer->BlitImage(GVkImage::ToView(Images.CloudsLR), GVkImage::ToView(Images.ColorHR));
+	auto view = GVkImage::ToView(Images.CloudsLR);
+	CommandBuffer->BlitImage(view, GVkImage::ToView(Images.ColorHR));
+	CommandBuffer->BindBarrier<GVkShaderReadBarrier>(view, VK_SHADER_STAGE_FRAGMENT_BIT);
+
 	CommandBuffer->Submit();
+	Order++;
 }

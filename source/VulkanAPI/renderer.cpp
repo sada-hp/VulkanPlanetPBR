@@ -43,6 +43,8 @@ GVulkanBase::~GVulkanBase()
 
 bool GVulkanBase::Draw(const GCamera& Camera, const IWorld& World)
 {
+	static glm::dmat4 reproj = glm::mat4(1.0);
+
 	if (m_Swapchain->QueryNextImage())
 	{
 		float Aspect = static_cast<float>(m_Swapchain->GetExtent().width) / static_cast<float>(m_Swapchain->GetExtent().height);
@@ -58,6 +60,7 @@ bool GVulkanBase::Draw(const GCamera& Camera, const IWorld& World)
 		UBO.view_proj = proj * view;
 		UBO.view_proj_no_offset = glm::mat4(proj) * basis;
 		UBO.view_proj_inv = glm::inverse(view) * glm::inverse(proj);
+		UBO.reproj = reproj;
 		UBO.sun_dir = glm::vec4(World.GetSunDirection(), 0.0);
 		UBO.eye_pos = glm::vec4(pos, 1.0);
 		UBO.time = glfwGetTime();
@@ -74,6 +77,7 @@ bool GVulkanBase::Draw(const GCamera& Camera, const IWorld& World)
 
 		m_Scope->IncrementFlightIndex();
 
+		reproj = UBO.view_proj;
 		return true;
 	}
 

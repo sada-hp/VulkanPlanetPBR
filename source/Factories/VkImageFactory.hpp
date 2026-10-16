@@ -7,22 +7,39 @@ namespace GVkImageFactory
 {
 	inline std::shared_ptr<GVkImage> Image(std::shared_ptr<RenderScope> Scope, VkFormat Format, VkExtent3D Extents, EImageFlags Flags, void* Pixels = nullptr, size_t size = 0)
 	{
-		std::shared_ptr<GVkImage> _image = std::make_shared<GVkImage>(Scope, Format, Extents, Flags);
+		std::shared_ptr<GVkImage> _image = std::make_shared<GVkImage>(Scope, Format, Extents, Flags | EImageFlags::TransferTarget);
 		std::shared_ptr<GVkCommandBuffer> _cmd = std::make_shared<GVkCommandBuffer>(Scope, VK_QUEUE_GRAPHICS_BIT);
+
+		std::shared_ptr<GVkBuffer> stagedBuffer = VK_NULL_HANDLE;
 
 		if (Pixels && size)
 		{
-			auto _buffer = std::make_shared<GVkBuffer>(Scope, size, EBufferFlags::Mapped | EBufferFlags::TransferSrc);
-			_cmd->UpdateBuffer(GVkBuffer::ToView(_buffer), (char*)Pixels);
-			_cmd->CopyBuffer(GVkBuffer::ToView(_buffer), GVkImage::ToView(_image, 0, 0, 1));
-
-			if (CheckFlag(Flags, EImageFlags::AllocateMipMaps) && _image->GetMipLevelsCount() > 1)
-			{
-
-			}
+			stagedBuffer = std::make_shared<GVkBuffer>(Scope, _image->GetAllocSize(), EBufferFlags::Mapped | EBufferFlags::TransferSrc);
+			_cmd->UpdateBuffer(GVkBuffer::ToView(stagedBuffer, 0, size), (char*)Pixels);
 		}
-		
-		_cmd->BindBarrier<GVkShaderReadBarrier>(GVkImage::ToView(_image), VK_SHADER_STAGE_FRAGMENT_BIT);
+
+		for (uint32_t i = 0; i < _image->FlightCount(); i++)
+		{
+			auto view = GVkImage::ToFlightHadle(_image, i);
+
+			if (stagedBuffer)
+			{
+				_cmd->CopyBuffer(GVkBuffer::ToView(stagedBuffer), view);
+
+				if (CheckFlag(Flags, EImageFlags::AllocateMipMaps) && _image->GetMipLevelsCount() > 1)
+					_cmd->GenerateMipMaps(_image);
+			}
+			else
+			{
+				if (_image->IsDepth())
+					_cmd->ClearImage(view, VkClearDepthStencilValue{});
+				else
+					_cmd->ClearImage(view, VkClearColorValue{});
+			}
+
+			_cmd->BindBarrier<GVkShaderReadBarrier>(view, VK_SHADER_STAGE_FRAGMENT_BIT);
+		}
+
 		_cmd->Submit();
 
 		return _image;

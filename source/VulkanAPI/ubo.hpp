@@ -7,6 +7,7 @@ using namespace glm;
 mat4 view_proj; \
 mat4 view_proj_no_offset; \
 mat4 view_proj_inv; \
+mat4 reproj; \
 vec4 sun_dir; \
 vec4 eye_pos; \
 float time; \

@@ -24,9 +24,9 @@ void GVkBarrier::Bind(VkCommandBuffer cmd)
 			std::vector<VkImageMemoryBarrier2> levelBarriers;
 			for (uint32_t Level = Image->BaseLevel(); Level < Image->LastLevel(); Level++)
 			{
-				imageBarrier.srcAccessMask = Image->GetRoot()->_getImageState(Level, Layer).access;
-				imageBarrier.srcStageMask = Image->GetRoot()->_getImageState(Level, Layer).stage;
-				imageBarrier.oldLayout = Image->GetRoot()->_getImageState(Level, Layer).layout;
+				imageBarrier.srcAccessMask = Image->_getImageState(Level, Layer).access;
+				imageBarrier.srcStageMask = Image->_getImageState(Level, Layer).stage;
+				imageBarrier.oldLayout = Image->_getImageState(Level, Layer).layout;
 				imageBarrier.subresourceRange.aspectMask = Image->GetSubresource().aspectMask;
 				imageBarrier.subresourceRange.baseArrayLayer = Layer;
 				imageBarrier.subresourceRange.baseMipLevel = Level;

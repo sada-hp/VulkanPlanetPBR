@@ -81,18 +81,26 @@ ShaderCodeDefinition(GShaders::CloudsCommonPS)
 	layout(binding = 3) uniform sampler2D TransmittanceLUT;
 	layout(binding = 4) uniform sampler3D CloudPerlinWorley;
 	layout(binding = 5) uniform sampler3D CloudHighFrequency;
+	// reprojection
+	layout(binding = 6) uniform sampler2D PreviousColor;
+	layout(binding = 7) uniform sampler2D PreviousDepth;
 
 	const float Coverage = 0.5;
 	const float BottomBound = Rg + 0.25 * Rdelta;
 	const float TopBound = Rg + 0.60 * Rdelta;
 	const float BoundDelta = TopBound - BottomBound;
 
+	layout(push_constant) uniform constants
+	{
+		layout(offset = 0) int Order;
+	} Settings;
+
 	float GetAbsorbtion()
 	{
 		return mix(0.25, 0.0025, Scattering.a);
 	}
 
-		vec3 GetUV(vec3 pos, float scale)
+	vec3 GetUV(vec3 pos, float scale)
 	{
 		return scale * vec3(pos / TopBound) + UBO.time * 1e-3;
 	}
@@ -207,7 +215,7 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 			pos += cone_dir;
 
 			cone_density += SampleDensity(pos, GetHeight(pos), mip) * length(cone_dir);
-			ds *= i < 4 ? 1.0 : 4.0;
+			ds *= i < 4 ? 1.0 : 2.0;
 		}
 
 		return GetAbsorbtion() * cone_density;
@@ -298,20 +306,58 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 		Scattering.a = 1.0 - Scattering.a;
 	}
 
+	bool IsInBounds(vec3 ndc)
+	{
+		return all(greaterThan(ndc.xyz, vec3(0.0))) && all(lessThan(ndc.xyz, vec3(1.0)));
+	}
+
+	bool IsCheckerboardActive(float depth)
+	{
+		int d0 = int(gl_FragCoord.x / 32) % 2;
+		int d1 = int(gl_FragCoord.y / 32) % 2;
+		int d2 = Settings.Order % 2;
+
+		return depth == 0 || d2 == 0 && d0 != d1 || d2 != 0 && d0 == d1;
+	}
+
 	void main()
 	{
+		float Depth = texture(PreviousDepth, UV).r;
+		Scattering = vec4(0.0);
+
 		vec4 screen_pos = vec4(2.0 * UV - 1.0, 0.0, 1.0);
 		screen_pos = UBO.view_proj_inv * screen_pos;
+		screen_pos /= screen_pos.w;
 
-		Scattering = vec4(0.0);
-		vec3 eye_pos = UBO.eye_pos.xyz;
-		vec3 ray_dir = normalize(screen_pos.xyz / screen_pos.w);
+		vec4 reprojected_pos = vec4(2.0 * UV - 1.0, Depth, 1.0);
+		reprojected_pos = UBO.view_proj_inv * reprojected_pos;
+		reprojected_pos /= reprojected_pos.w;
 
-		vec3 ray_origin, ray_end;
-		if (get_ray(eye_pos, ray_dir, ray_origin, ray_end))
+		reprojected_pos = UBO.reproj * reprojected_pos;
+		reprojected_pos /= reprojected_pos.w;
+		reprojected_pos.xy = reprojected_pos.xy * 0.5 + 0.5;
+
+		if (IsCheckerboardActive(Depth) || !IsInBounds(reprojected_pos.xyz))
 		{
-			MarchToCloud(ray_origin, ray_end);
+			vec3 eye_pos = UBO.eye_pos.xyz;
+			vec3 ray_dir = normalize(screen_pos.xyz);
+
+			vec3 ray_origin, ray_end;
+			if (get_ray(eye_pos, ray_dir, ray_origin, ray_end))
+			{
+				vec4 clip = UBO.view_proj * vec4(ray_origin, 1.0);
+				Depth = clip.z / clip.w;
+
+				MarchToCloud(ray_origin, ray_end);
+			}
 		}
+		else
+		{
+			Scattering = texture(PreviousColor, reprojected_pos.xy);
+			Depth = reprojected_pos.z;
+		}
+
+		gl_FragDepth = Depth;
 	}
 );
 

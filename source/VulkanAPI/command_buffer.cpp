@@ -180,6 +180,16 @@ void GVkCommandBuffer::ClearImage(std::shared_ptr<GVkImageView> Image, VkClearCo
 	object.acquired_resources.emplace_back(Image);
 }
 
+void GVkCommandBuffer::ClearImage(std::shared_ptr<GVkImageView> View, VkClearDepthStencilValue ClearValue)
+{
+	auto& object = _updateRecording();
+
+	BindBarrier<GVkTransferDstBarrier>(View);
+	vkCmdClearDepthStencilImage(object.cmd, View->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &ClearValue, 1, &View->GetSubresource());
+
+	object.acquired_resources.emplace_back(View);
+}
+
 void GVkCommandBuffer::BlitImage(std::shared_ptr<GVkImageView> Image, std::shared_ptr<GVkSwapchain> Swapchain)
 {
 	auto& object = _updateRecording();

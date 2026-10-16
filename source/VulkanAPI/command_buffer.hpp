@@ -68,6 +68,7 @@ public:
 
 	void GenerateMipMaps(std::shared_ptr<GVkImage> Image);
 	void ClearImage(std::shared_ptr<GVkImageView> View, VkClearColorValue ClearValue);
+	void ClearImage(std::shared_ptr<GVkImageView> View, VkClearDepthStencilValue ClearValue);
 
 	void BeginRenderPass(std::shared_ptr<GVkRenderPass> RenderPass, std::shared_ptr<GVkFramebuffer> Framebuffer);
 	void EndRenderPass();

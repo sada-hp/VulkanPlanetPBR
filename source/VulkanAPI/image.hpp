@@ -54,9 +54,8 @@ private:
 	_internalObj& _activeObj() { return m_flightResources.at(_activeIndex()); }
 
 protected:
-	const GVkImageState& _getImageState(uint32_t Level, uint32_t Layer = 0) const;
-	void _setImageState(uint32_t Level, uint32_t Layer, VkImageLayout Layout, VkPipelineStageFlags Stage, VkAccessFlags Access);
-	void _setImageState(const VkImageSubresourceRange& Range, VkImageLayout Layout, VkPipelineStageFlags Stage, VkAccessFlags Access);
+	const GVkImageState& _getImageState(uint32_t Index, uint32_t Level, uint32_t Layer) const;
+	void _setImageState(uint32_t Index, const VkImageSubresourceRange& Range, VkImageLayout Layout, VkPipelineStageFlags Stage, VkAccessFlags Access);
 
 public:
 	inline const VkImage& operator[](size_t index) const { return m_flightResources.at(index % m_flightResources.size()).image; }
@@ -75,13 +74,16 @@ public:
 	const VkImageAspectFlags& GetAspect() const { return m_SubRange.aspectMask; };
 	const VkImageType GetImageType() const { return m_Type; };
 	const VkFormat& GetFormat() const { return m_Format; };
-	
+	size_t GetAllocSize() const;
+
 	uint32_t GetMipLevelsCount() const { return m_SubRange.levelCount; };
 	uint32_t GetArrayLayers() const { return m_SubRange.layerCount; };
+	uint32_t FlightCount() const { return m_flightResources.size(); }
 
 	VkExtent3D GetExtent(uint32_t Level = 0) const { return VkExtent3D{ m_Extents.width >> Level, m_Extents.height >> Level, m_Extents.depth >> Level }; };
 
 	static std::shared_ptr<GVkImageView> ToView(std::shared_ptr<GVkImage> Image, uint32_t Level = 0, uint32_t Layer = 0, uint32_t Levels = VK_REMAINING_MIP_LEVELS, uint32_t Layers = VK_REMAINING_ARRAY_LAYERS, VkImageViewType TypeOverride = VK_IMAGE_VIEW_TYPE_MAX_ENUM);
+	static std::shared_ptr<GVkImageView> ToFlightHadle(std::shared_ptr<GVkImage> Image, int32_t shuffle_offset);
 	static std::shared_ptr<GVkImageView> ToView(std::shared_ptr<GVkImage> Image, VkImageViewType Type);
 };
 
@@ -100,17 +102,37 @@ private:
 	std::vector<_internalObj> m_flightResources = {};
 	VkImageSubresourceRange m_Subresource;
 	VkImageViewType m_type;
+	int32_t m_shuffle = 0;
+
+private:
+	uint32_t _mapIndex(int32_t index) const
+	{
+		if (m_shuffle != 0)
+			int k = 0;
+
+		index += m_shuffle;
+		if (index < 0)
+			index = m_flightResources.size() + index;
+
+		return index % m_flightResources.size();
+	}
+
+	uint32_t _activeIndex() const
+	{
+		return _mapIndex(m_Image->_activeIndex());
+	}
 
 protected:
 	void _setImageState(VkImageLayout Layout, VkPipelineStageFlags Stage, VkAccessFlags Access);
+	const GVkImageState& _getImageState(uint32_t Level, uint32_t Layer);
 
 public:
-	GVkImageView(std::shared_ptr<GVkImage> Image, VkImageSubresourceRange Range, VkImageViewType Type);
+	GVkImageView(std::shared_ptr<GVkImage> Image, VkImageSubresourceRange Range, VkImageViewType Type, int32_t shuffle = 0);
 	~GVkImageView();
 
-	const VkImageView& At(size_t index) const { return m_flightResources[index % m_flightResources.size()].view; }
-	const VkImageView& GetImageView() const { return m_flightResources[m_Image->_activeIndex()].view; }
-	const VkImage& GetImage() const { return m_Image->GetImage(); }
+	const VkImageView& At(size_t index) const { return m_flightResources[_mapIndex(index)].view; }
+	const VkImageView& GetImageView() const { return m_flightResources[_activeIndex()].view; }
+	const VkImage& GetImage() const { return m_Image->At(_activeIndex()); }
 	const VkImageViewType GetType() const { return m_type; }
 
 	uint32_t GetLayerCount() const;
