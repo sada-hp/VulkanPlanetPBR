@@ -143,15 +143,51 @@ std::string GraphicsPipelineDescriptor::HashString() const
 	hashString += GS.HashString();
 	hashString += PS.HashString();
 
-	hashString += std::string((char*)&subpass, sizeof(subpass));
-	hashString += std::string((char*)&blendState, sizeof(blendState));
-	hashString += std::string((char*)&vertexInput, sizeof(vertexInput));
-	hashString += std::string((char*)&inputAssembly, sizeof(inputAssembly));
-	hashString += std::string((char*)&viewportState, sizeof(viewportState));
-	hashString += std::string((char*)&multisampleState, sizeof(multisampleState));
-	hashString += std::string((char*)&depthStencilState, sizeof(depthStencilState));
-	hashString += std::string((char*)&rasterizationState, sizeof(rasterizationState));
-	hashString += std::string((char*)blendAttachments.data(), sizeof(VkPipelineColorBlendAttachmentState) * blendAttachments.size());
+	hashString += std::string(reinterpret_cast<const char*>(&subpass), sizeof(subpass));
+	
+	hashString += std::string(reinterpret_cast<const char*>(blendState.blendConstants), sizeof(blendState.blendConstants));
+	hashString += std::string(reinterpret_cast<const char*>(&blendState.attachmentCount), sizeof(uint32_t));
+	hashString += std::string(reinterpret_cast<const char*>(&blendState.logicOpEnable), sizeof(VkBool32));
+	hashString += std::string(reinterpret_cast<const char*>(&blendState.logicOp), sizeof(VkLogicOp));
+
+	if (blendState.pAttachments)
+		hashString += std::string(reinterpret_cast<const char*>(blendState.pAttachments), sizeof(VkPipelineColorBlendAttachmentState) * blendState.attachmentCount);
+
+	if (vertexInput.pVertexAttributeDescriptions)
+		hashString += std::string(reinterpret_cast<const char*>(vertexInput.pVertexAttributeDescriptions), sizeof(VkVertexInputAttributeDescription));
+	
+	if (vertexInput.pVertexBindingDescriptions)
+		hashString += std::string(reinterpret_cast<const char*>(vertexInput.pVertexBindingDescriptions), sizeof(VkVertexInputBindingDescription));
+	
+	hashString += std::string(reinterpret_cast<const char*>(&vertexInput.vertexAttributeDescriptionCount), sizeof(uint32_t));
+	hashString += std::string(reinterpret_cast<const char*>(&vertexInput.vertexBindingDescriptionCount), sizeof(uint32_t));
+	hashString += std::string(reinterpret_cast<const char*>(&inputAssembly.topology), sizeof(VkPrimitiveTopology));
+	
+	// viewport
+
+	hashString += std::string(reinterpret_cast<const char*>(&multisampleState.rasterizationSamples), sizeof(VkSampleCountFlagBits));
+	hashString += std::string(reinterpret_cast<const char*>(&multisampleState.alphaToCoverageEnable), sizeof(VkBool32));
+	hashString += std::string(reinterpret_cast<const char*>(&multisampleState.sampleShadingEnable), sizeof(VkBool32));
+	hashString += std::string(reinterpret_cast<const char*>(&multisampleState.alphaToOneEnable), sizeof(VkBool32));
+	hashString += std::string(reinterpret_cast<const char*>(&multisampleState.minSampleShading), sizeof(float));
+
+	hashString += std::string(reinterpret_cast<const char*>(&depthStencilState.depthBoundsTestEnable), sizeof(VkBool32));
+	hashString += std::string(reinterpret_cast<const char*>(&depthStencilState.depthCompareOp), sizeof(VkCompareOp));
+	hashString += std::string(reinterpret_cast<const char*>(&depthStencilState.depthWriteEnable), sizeof(VkBool32));
+	hashString += std::string(reinterpret_cast<const char*>(&depthStencilState.depthTestEnable), sizeof(VkBool32));
+	hashString += std::string(reinterpret_cast<const char*>(&depthStencilState.front), sizeof(VkStencilOpState));
+	hashString += std::string(reinterpret_cast<const char*>(&depthStencilState.back), sizeof(VkStencilOpState));
+	hashString += std::string(reinterpret_cast<const char*>(&depthStencilState.minDepthBounds), sizeof(float));
+	hashString += std::string(reinterpret_cast<const char*>(&depthStencilState.maxDepthBounds), sizeof(float));
+	
+	hashString += std::string(reinterpret_cast<const char*>(&rasterizationState.depthBiasConstantFactor), sizeof(float));
+	hashString += std::string(reinterpret_cast<const char*>(&rasterizationState.cullMode), sizeof(VkCullModeFlagBits));
+	hashString += std::string(reinterpret_cast<const char*>(&rasterizationState.depthBiasSlopeFactor), sizeof(float));
+	hashString += std::string(reinterpret_cast<const char*>(&rasterizationState.depthClampEnable), sizeof(VkBool32));
+	hashString += std::string(reinterpret_cast<const char*>(&rasterizationState.depthBiasEnable), sizeof(VkBool32));
+	hashString += std::string(reinterpret_cast<const char*>(&rasterizationState.frontFace), sizeof(VkFrontFace));
+	hashString += std::string(reinterpret_cast<const char*>(&rasterizationState.depthBiasClamp), sizeof(float));
+	hashString += std::string(reinterpret_cast<const char*>(&rasterizationState.lineWidth), sizeof(float));
 
 	return hashString;
 }

@@ -67,10 +67,16 @@ public:
 	}
 
 	template<typename Type>
+	TransformMatrix& SetRotation(const glm::qua<Type>& Q)
+	{
+		angles = glm::degrees(glm::eulerAngles(Q));
+		return *this;
+	}
+
+	template<typename Type>
 	TransformMatrix& SetRotation(const glm::mat<3, 3, Type>& M)
 	{
-		angles = glm::eulerAngles(glm::qua<TRotation>(M));
-		return *this;
+		return SetRotation(glm::qua<TRotation>(M));
 	}
 
 	template<typename Type>
@@ -81,26 +87,22 @@ public:
 	}
 
 	template<typename Type>
-	TransformMatrix& SetRotation(const glm::vec<3, Type>& R, const glm::vec<3, Type>& U, const glm::vec<3, Type>& F)
+	TransformMatrix& SetRotation(const glm::vec<3, Type>& F, const glm::vec<3, Type>& U)
 	{
-		glm::mat<3, 3, TRotation> m;
-		m[0] = glm::vec<3, TRotation>(R);
-		m[1] = glm::vec<3, TRotation>(U);
-		m[2] = glm::vec<3, TRotation>(F);
-
-		return SetRotation(m);
+		glm::qua<Type> q = glm::quatLookAt(-F, U);
+		return SetRotation(q);
 	}
 
 	template<typename Type>
-	TransformMatrix& SetRotation(const glm::vec<3, Type>& U, const glm::vec<3, Type>& F)
+	TransformMatrix& Move(const glm::vec<3, Type>& V)
 	{
-		return SetRotation(glm::normalize(glm::cross(U, F)), U, F);
+		return SetOffset(offset + glm::vec<3, TOffset>(GetOrientation() * V));
 	}
 
 	template<typename Type>
 	TransformMatrix& Translate(const glm::vec<3, Type>& V)
 	{
-		return SetOffset(offset + glm::vec<3, TOffset>(GetOrientation() * V));
+		return offset + V;
 	}
 
 	template<typename Type>

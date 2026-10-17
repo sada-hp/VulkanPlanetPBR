@@ -49,7 +49,7 @@ ShaderCodeDefinition(GShaders::MeshPS)
 	void main()
 	{
 		Color = texture(Albedo[Submesh], UV);
-		Position = vec4(WorldPosition, 1.0);
+		Position = vec4(WorldPosition, Submesh);
 		Normal = vec4(VertNormal, 0.0);
 	}
 );
@@ -71,7 +71,7 @@ ShaderCodeDefinition(GShaders::MeshDefaultPS)
 		Color.rb = mix(vec2(0.0), vec2(0.5), float(sign(Checker.x) == sign(Checker.y)));
 		Color.ga = vec2(0.0, 1.0);
 		
-		Position = vec4(WorldPosition, 1.0);
+		Position = vec4(WorldPosition, Submesh);
 		Normal = vec4(VertNormal, 0.0);
 	}
 );

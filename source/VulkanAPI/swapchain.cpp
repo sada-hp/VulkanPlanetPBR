@@ -12,6 +12,8 @@ GVkSwapchain::GVkSwapchain(const std::shared_ptr<RenderScope>& InScope, GLFWwind
 
 GVkSwapchain::~GVkSwapchain()
 {
+	vkDeviceWaitIdle(Scope->GetDevice());
+
 	_clear();
 	vkDestroySurfaceKHR(Scope->GetInstance(), m_Surface, VK_NULL_HANDLE);
 }

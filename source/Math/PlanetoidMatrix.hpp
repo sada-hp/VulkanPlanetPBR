@@ -36,10 +36,15 @@ public:
 	}
 
 	template<typename Type = TRotation>
+	glm::mat<3, 3, Type> GetPlanetOrientation() const
+	{
+		return GEllipsoid::EulerFromCartesian(GetPosition());
+	}
+
+	template<typename Type = TRotation>
 	glm::mat<3, 3, Type> GetOrientation() const
 	{
-		glm::mat<3, 3, TRotation> planet_orientation = GEllipsoid::EulerFromCartesian(GetPosition());
-		return planet_orientation * local_offset.GetOrientation();
+		return GetPlanetOrientation() * local_offset.GetOrientation();
 	}
 
 	template<typename Type = TOffset>
@@ -61,9 +66,16 @@ public:
 	}
 
 	template<typename Type = TOffset>
-	EllipsoidMatrix& Translate(const glm::vec<3, Type>& V)
+	EllipsoidMatrix& Move(const glm::vec<3, Type>& V)
 	{
 		local_offset.SetOffset(local_offset.GetPosition<Type>() + GetOrientation<Type>() * V);
+		return *this;
+	}
+
+	template<typename Type = TOffset>
+	EllipsoidMatrix& Translate(const glm::vec<3, Type>& V)
+	{
+		local_offset.SetOffset(local_offset.GetPosition<Type>() + GetPlanetOrientation<Type>() * V);
 		return *this;
 	}
 
@@ -83,5 +95,19 @@ public:
 
 		glm::mat<4, 4, Type> m4 = glm::mat<4, 4, Type>(m3);
 		return glm::translate(m4, p);
+	}
+
+	template<typename Type = TOffset>
+	EllipsoidMatrix& LookAt(const glm::vec<3, Type>& target)
+	{
+		glm::mat<3, 3, Type> planet_orientation = GetPlanetOrientation();
+		glm::vec<3, Type> eye = GetPosition();
+
+		glm::vec<3, Type> fwd = glm::normalize(target - eye);
+		glm::vec<3, Type> up = planet_orientation[1];
+
+		glm::qua<Type> q = glm::quatLookAt(-fwd, up);
+		local_offset.SetRotation(glm::transpose(planet_orientation) * glm::mat3_cast(q));
+		return *this;
 	}
 };
