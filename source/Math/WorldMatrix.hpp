@@ -1,18 +1,36 @@
 #pragma once
+#include "Engine/object.hpp"
+
 #include "glm/glm.hpp"
 #include "glm/gtc/quaternion.hpp"
 
 template<typename TRotation, typename TOffset>
-struct TransformMatrix
+struct TransformMatrix : public GObject
 {
+	friend class EllipsoidMatrix;
+
+protected:
+	glm::mat<4, 4, TOffset> matrix = glm::mat<4, 4, TOffset>(1.0);
+
 protected:
 	glm::vec<3, TRotation> angles = glm::vec<3, TRotation>(0.0);
 	glm::vec<3, TOffset> offset = glm::vec<3, TOffset>(0.0);
 
+protected:
+	void _update()
+	{
+		matrix = glm::toMat4(glm::qua<TOffset>(glm::radians(angles)));
+		matrix[3] = glm::vec<4, TOffset>(offset, 1.0);
+
+		invokeChange();
+	}
+
 public:
 	TransformMatrix() = default;
 	TransformMatrix(const TransformMatrix& other)
+		: GObject(other)
 	{
+		matrix = other.matrix;
 		angles = other.angles;
 		offset = other.offset;
 	}
@@ -26,7 +44,7 @@ public:
 	template<typename Type = TRotation>
 	glm::mat<3, 3, Type> GetOrientation() const
 	{
-		return glm::toMat3(glm::qua<TRotation>(glm::vec<3, Type>(glm::radians(angles.x), glm::radians(angles.y), glm::radians(angles.z))));
+		return glm::mat<3, 3, Type>(matrix);
 	}
 
 	template<typename Type = TRotation>
@@ -57,6 +75,8 @@ public:
 	TransformMatrix& SetOffset(const glm::vec<3, Type>& V)
 	{
 		offset = glm::vec<3, TOffset>(V);
+		_update();
+
 		return *this;
 	}
 
@@ -70,6 +90,8 @@ public:
 	TransformMatrix& SetRotation(const glm::qua<Type>& Q)
 	{
 		angles = glm::degrees(glm::eulerAngles(Q));
+		_update();
+
 		return *this;
 	}
 
@@ -83,14 +105,15 @@ public:
 	TransformMatrix& SetRotation(Type pitch, Type yaw, Type roll)
 	{
 		angles = glm::vec<3, TRotation>(pitch, yaw, roll);
+		_update();
+
 		return *this;
 	}
 
 	template<typename Type>
 	TransformMatrix& SetRotation(const glm::vec<3, Type>& F, const glm::vec<3, Type>& U)
 	{
-		glm::qua<Type> q = glm::quatLookAt(-F, U);
-		return SetRotation(q);
+		return SetRotation(glm::quatLookAt(-F, U));
 	}
 
 	template<typename Type>
@@ -102,7 +125,7 @@ public:
 	template<typename Type>
 	TransformMatrix& Translate(const glm::vec<3, Type>& V)
 	{
-		return offset + V;
+		return SetOffset(offset + V);
 	}
 
 	template<typename Type>
@@ -116,14 +139,13 @@ public:
 	{
 		SetRotation(glm::mat<3, 3, TRotation>(M));
 		SetOffset(M[3][0], M[3][1], M[3][2]);
+
 		return *this;
 	}
 
-	template<typename Type = TOffset>
-	glm::mat<4, 4, Type> GetMatrix() const
+	const glm::mat<4, 4, TOffset>& GetMatrix() const
 	{
-		glm::mat<4, 4, Type> m = glm::mat<4, 4, Type>(GetOrientation());
-		return glm::translate(m, GetPosition());
+		return matrix;
 	}
 };
 

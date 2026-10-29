@@ -78,8 +78,12 @@ void GMeshStage::Execute(const GCamera& Camera, const IWorld& World)
 		/*
 		* Preprocess world matrix on CPU to avoid FP64 math on GPU
 		*/
-		glm::dmat4 WorldMatrix = matrix->GetMatrix<double>();
-		glm::mat4 CompressedMatrix = glm::translate(WorldMatrix, -CameraOffset);
+		glm::dmat4 WorldMatrix = matrix->GetMatrix();
+		WorldMatrix[3].x -= CameraOffset.x;
+		WorldMatrix[3].y -= CameraOffset.y;
+		WorldMatrix[3].z -= CameraOffset.z;
+
+		glm::mat4 CompressedMatrix = WorldMatrix;
 		bool IsIndexed = object->Mesh->IndexCount() > 0;
 
 		CommandBuffer->BindVertexBuffer(0, GVkBuffer::ToView(object->Mesh->VertexBuffer()));

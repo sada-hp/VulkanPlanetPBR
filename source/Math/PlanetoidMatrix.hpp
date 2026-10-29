@@ -2,21 +2,43 @@
 #include "EllipsoidMath.hpp"
 #include "WorldMatrix.hpp"
 
-struct EllipsoidMatrix
+struct EllipsoidMatrix : public GObject
 {
 	using TRotation = float;
 	using TOffset = double;
 
+private:
+	const glm::vec<3, TOffset> position_base = glm::vec<3, TOffset>(0.0, GEllipsoid::Rg, 0.0);
+	glm::mat<3, 3, TRotation> orientation_base = glm::mat<3, 3, TRotation>(1.0);
+	glm::mat<4, 4, TOffset> matrix = glm::mat<4, 4, TOffset>(1.0);
+
 protected:
-	const glm::vec<3, TOffset> planet_base = glm::vec<3, TOffset>(0.0, GEllipsoid::Rg, 0.0);
 	LocalMatrix local_offset;
 
+private:
+	void _update()
+	{
+		glm::vec<3, TOffset> p = position_base + local_offset.GetPosition();
+		orientation_base = GEllipsoid::EulerFromCartesian(p);
+
+		matrix = glm::mat<4, 4, TOffset>(orientation_base * local_offset.GetOrientation());
+		matrix[3] = glm::vec<4, TOffset>(p, 1.0);
+
+		invokeChange();
+	}
+
 public:
-	EllipsoidMatrix() = default;
+	EllipsoidMatrix()
+	{
+		local_offset.onChange(this, &EllipsoidMatrix::_update);
+	}
 
 	EllipsoidMatrix(const EllipsoidMatrix& other)
 	{
 		local_offset = other.local_offset;
+
+		local_offset.onChange(this, &EllipsoidMatrix::_update);
+		_update();
 	}
 
 	LocalMatrix& GetLocalMatrix()
@@ -32,19 +54,19 @@ public:
 	template<typename Type = TOffset>
 	glm::vec<3, Type> GetPosition() const
 	{
-		return planet_base + local_offset.GetPosition();
+		return glm::vec<3, Type>(matrix[3]);
 	}
 
 	template<typename Type = TRotation>
 	glm::mat<3, 3, Type> GetPlanetOrientation() const
 	{
-		return GEllipsoid::EulerFromCartesian(GetPosition());
+		return orientation_base;
 	}
 
 	template<typename Type = TRotation>
 	glm::mat<3, 3, Type> GetOrientation() const
 	{
-		return GetPlanetOrientation() * local_offset.GetOrientation();
+		return glm::mat<3, 3, Type>(matrix);
 	}
 
 	template<typename Type = TOffset>
@@ -79,6 +101,13 @@ public:
 		return *this;
 	}
 
+	template<typename Type = TOffset>
+	EllipsoidMatrix& SetPosition(const glm::vec<3, Type>& Off)
+	{
+		local_offset.SetOffset(Off - position_base);
+		return *this;
+	}
+
 	template<typename Type = TRotation>
 	EllipsoidMatrix& Rotate(Type pitch, Type yaw, Type roll)
 	{
@@ -86,15 +115,9 @@ public:
 		return *this;
 	}
 
-	template<typename Type = TOffset>
-	glm::mat<4, 4, Type> GetMatrix() const
+	const glm::mat<4, 4, TOffset>& GetMatrix() const
 	{
-		glm::vec<3, Type> p = planet_base + local_offset.GetPosition();
-		glm::mat<3, 3, Type> m3 = GEllipsoid::EulerFromCartesian(p);
-		m3 = m3 * local_offset.GetOrientation<Type>();
-
-		glm::mat<4, 4, Type> m4 = glm::mat<4, 4, Type>(m3);
-		return glm::translate(m4, p);
+		return matrix;
 	}
 
 	template<typename Type = TOffset>
