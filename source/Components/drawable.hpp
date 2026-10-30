@@ -10,6 +10,7 @@ struct GDrawable : public IComponent
 	friend class GMeshPreprocessStage;
 	friend class GCullingStage;
 	friend class GMeshStage;
+	friend class IWorld;
 
 private:
 	std::shared_ptr<GVkCommandBuffer> _commandBuffer = VK_NULL_HANDLE;

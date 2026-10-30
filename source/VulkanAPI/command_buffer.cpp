@@ -51,10 +51,21 @@ GVkCommandBuffer::_internalObj& GVkCommandBuffer::_updateRecording(const VkComma
 
 		object.fence->Wait();
 
-		VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-		beginInfo.flags = inheritance ? VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT : VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-		beginInfo.pInheritanceInfo = inheritance;
-		vkBeginCommandBuffer(object.cmd, &beginInfo);
+		if (CheckFlag(m_cmdFlags, ECmdFlags::Secondary))
+		{
+			VkCommandBufferInheritanceInfo inh{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO };
+
+			VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+			beginInfo.flags = inheritance ? VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT : 0;
+			beginInfo.pInheritanceInfo = inheritance ? inheritance : &inh;
+			vkBeginCommandBuffer(object.cmd, &beginInfo);
+		}
+		else
+		{
+			VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+			beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+			vkBeginCommandBuffer(object.cmd, &beginInfo);
+		}
 	}
 
 	return object;
@@ -356,6 +367,14 @@ void GVkCommandBuffer::SetRenderArea(const VkRect2D& Scissor, const VkViewport& 
 		vkCmdSetViewport(object.cmd, 0, 1, &Viewport);
 		vkCmdSetScissor(object.cmd, 0, 1, &Scissor);
 	}
+}
+
+void GVkCommandBuffer::NextSubpass()
+{
+	auto& object = _activeObj();
+
+	assert(object.renderPass);
+	_nextSubpass();
 }
 
 void GVkCommandBuffer::EndRenderPass()

@@ -26,6 +26,10 @@ GCullingStage::~GCullingStage()
 void GCullingStage::Execute(const GCamera& Camera, const IWorld& World)
 {
 	uint32_t Count = World.GetRegistry().view<GDrawable, EllipsoidMatrix>().size_hint();
+
+	if (Count == 0)
+		return;
+
 	uint32_t Invocations = (Count / 32) + uint32_t(Count % 32 > 0);
 
 	_shaderData Data;

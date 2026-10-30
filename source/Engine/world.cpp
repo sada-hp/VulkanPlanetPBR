@@ -52,7 +52,35 @@ void IWorld::update_descriptors()
 	DSDescTransform.AddUniformBuffer(VK_SHADER_STAGE_COMPUTE_BIT, transformBuffers);
 	_transformsSet = DSDescTransform.Allocate(Scope);
 
+	_syncCommandBuffer = std::make_shared<GVkCommandBuffer>(Scope, VK_QUEUE_GRAPHICS_BIT, ECmdFlags::InFlight | ECmdFlags::Secondary);
+
 	bDescriptorsDirty = false;
+}
+
+VkCommandBuffer IWorld::GetPrerecorderSyncCommands() const
+{
+	if (!_syncCommandBuffer)
+		return VK_NULL_HANDLE;
+
+	if (!_syncCommandBuffer->IsRecorded())
+	{
+		auto view = registry.view<EllipsoidMatrix, GDrawable>();
+
+		std::vector<VkBufferMemoryBarrier2> bufferBarriers{};
+		for (const auto& [ent, matrix, object] : view.each())
+		{
+			GVkBarrier barrierConditional = GVkBarrier(object._drawCall->ConditionalBuffer(), VK_PIPELINE_STAGE_2_CONDITIONAL_RENDERING_BIT_EXT, VK_ACCESS_2_CONDITIONAL_RENDERING_READ_BIT_EXT);
+			barrierConditional.GetBufferBarreirs(bufferBarriers);
+
+			GVkBarrier barrierIndirect = GVkBarrier(object._drawCall->IndirectBuffer(), VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT);
+			barrierIndirect.GetBufferBarreirs(bufferBarriers);
+		}
+
+		_syncCommandBuffer->BindBarriers(bufferBarriers, {});
+		_syncCommandBuffer->Submit();
+	}
+
+	return _syncCommandBuffer->GetCommandBuffer();
 }
 
 std::shared_ptr<GActor> IWorld::NewActor()

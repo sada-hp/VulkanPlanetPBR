@@ -209,10 +209,7 @@ std::shared_ptr<GVkDescriptorSet> DescriptorSetDescriptor::Allocate(std::shared_
 
 	std::unordered_map<VkDescriptorType, uint32_t> descriptor_counts = {};
 	for (auto& binding : layoutDescriptor.bindings)
-	{
-		binding.descriptorCount = _clampToCapability(Scope, binding.descriptorType, binding.descriptorCount);
 		descriptor_counts[binding.descriptorType] += binding.descriptorCount;
-	}
 
 	std::vector<VkDescriptorPoolSize> pool_sizes = {};
 	for (auto& [type, count] : descriptor_counts)
@@ -366,6 +363,9 @@ DescriptorLayoutDescriptor& DescriptorLayoutDescriptor::AddSubpassAttachment(VkS
 
 std::shared_ptr<GVkDescriptorSetLayout> DescriptorLayoutDescriptor::Construct(std::shared_ptr<RenderScope> Scope)
 {
+	for (auto& binding : bindings)
+		binding.descriptorCount = _clampToCapability(Scope, binding.descriptorType, binding.descriptorCount);
+
 	VkDescriptorSetLayoutBindingFlagsCreateInfo layoutFlagsInfo = {};
 	layoutFlagsInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
 	layoutFlagsInfo.pBindingFlags = flags.data();

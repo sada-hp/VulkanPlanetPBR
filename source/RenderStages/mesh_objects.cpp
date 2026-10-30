@@ -65,32 +65,17 @@ void GMeshStage::_initCompositePass()
 	Pipelines.Composite = PSODesc.Construct(Scope);
 }
 
-void GVkCommandBuffer::NextSubpass()
-{
-	auto& object = _activeObj();
-
-	assert(object.renderPass);
-	_nextSubpass();
-}
-
 void GMeshStage::Execute(const GCamera& Camera, const IWorld& World)
 {
 	auto view = World.GetRegistry().view<EllipsoidMatrix, GDrawable>();
 
+	if (view.size_hint() == 0)
+		return;
+
 	VkRect2D Scissor = Framebuffer->GetRenderArea();
 	VkViewport Viewport = { 0, 0, Scissor.extent.width, Scissor.extent.height, 0.0, 1.0 };
 
-	std::vector<VkBufferMemoryBarrier2> bufferBarriers{};
-	for (const auto& [ent, matrix, object] : view.each())
-	{
-		GVkBarrier barrierConditional = GVkBarrier(object._drawCall->ConditionalBuffer(), VK_PIPELINE_STAGE_2_CONDITIONAL_RENDERING_BIT_EXT, VK_ACCESS_2_CONDITIONAL_RENDERING_READ_BIT_EXT);
-		barrierConditional.GetBufferBarreirs(bufferBarriers);
-
-		GVkBarrier barrierIndirect = GVkBarrier(object._drawCall->IndirectBuffer(), VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT);
-		barrierIndirect.GetBufferBarreirs(bufferBarriers);
-	}
-
-	CommandBuffer->BindBarriers(bufferBarriers, {});
+	CommandBuffer->Execute({ World.GetPrerecorderSyncCommands() });
 
 	CommandBuffer->BeginRenderPass(RenderPass, Framebuffer, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
