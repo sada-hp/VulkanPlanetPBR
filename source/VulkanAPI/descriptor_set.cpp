@@ -5,15 +5,15 @@
 static uint32_t _clampToCapability(std::shared_ptr<RenderScope> Scope, VkDescriptorType type, uint32_t size)
 {
 	if (type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-		return std::min(Scope->DeviceLimits().maxPerStageDescriptorSamplers, size);
+		return std::min(Scope->DeviceLimits().maxPerStageDescriptorSamplers / 2, size);
 	else if (type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
-		return std::min(Scope->DeviceLimits().maxPerStageDescriptorUniformBuffers, size);
+		return std::min(Scope->DeviceLimits().maxPerStageDescriptorUniformBuffers / 2, size);
 	else if (type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
-		return std::min(Scope->DeviceLimits().maxPerStageDescriptorStorageBuffers, size);
+		return std::min(Scope->DeviceLimits().maxPerStageDescriptorStorageBuffers / 2, size);
 	else if (type == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
-		return std::min(Scope->DeviceLimits().maxPerStageDescriptorStorageImages, size);
+		return std::min(Scope->DeviceLimits().maxPerStageDescriptorStorageImages / 2, size);
 	else if (type == VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT)
-		return std::min(Scope->DeviceLimits().maxPerStageDescriptorInputAttachments, size);
+		return std::min(Scope->DeviceLimits().maxPerStageDescriptorInputAttachments / 2, size);
 
 	return size;
 }
