@@ -2,6 +2,22 @@
 
 #define MAX_DESCRIPTOR_SIZE 65384
 
+static uint32_t _clampToCapability(std::shared_ptr<RenderScope> Scope, VkDescriptorType type, uint32_t size)
+{
+	if (type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+		return std::min(Scope->DeviceLimits().maxPerStageDescriptorSamplers, size);
+	else if (type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+		return std::min(Scope->DeviceLimits().maxPerStageDescriptorUniformBuffers, size);
+	else if (type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
+		return std::min(Scope->DeviceLimits().maxPerStageDescriptorStorageBuffers, size);
+	else if (type == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
+		return std::min(Scope->DeviceLimits().maxPerStageDescriptorStorageImages, size);
+	else if (type == VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT)
+		return std::min(Scope->DeviceLimits().maxPerStageDescriptorInputAttachments, size);
+
+	return size;
+}
+
 GVkDescriptorSet::GVkDescriptorSet(std::shared_ptr<RenderScope> InScope)
 	: Scope(InScope)
 {
@@ -192,12 +208,12 @@ std::shared_ptr<GVkDescriptorSet> DescriptorSetDescriptor::Allocate(std::shared_
 	uint32_t FlightCount = bIsInFlight ? Scope->GetMaxFramesInFlight() : 1;
 
 	std::unordered_map<VkDescriptorType, uint32_t> descriptor_counts = {};
-	for (auto binding : layoutDescriptor.bindings)
-		descriptor_counts[binding.descriptorType] += FlightCount * binding.descriptorCount;
+	for (auto& binding : layoutDescriptor.bindings)
+		descriptor_counts[binding.descriptorType] += binding.descriptorCount;
 
 	std::vector<VkDescriptorPoolSize> pool_sizes = {};
 	for (auto& [type, count] : descriptor_counts)
-		pool_sizes.emplace_back(type, count);
+		pool_sizes.emplace_back(type, FlightCount * _clampToCapability(Scope, type, count));
 
 	VkDescriptorPoolCreateInfo poolCreateInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
 	poolCreateInfo.maxSets = FlightCount;

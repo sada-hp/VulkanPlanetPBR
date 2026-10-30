@@ -54,6 +54,7 @@ public:
 
 	inline const uint32_t& GetMaxFramesInFlight() const { return FramesInFlight; }
 	inline const uint32_t& GetResourceIndex() const { return m_ResourceIndex; }
+	VkPhysicalDeviceProperties m_DeviceProperties{};
 
 	inline const Queue& GetQueue(VkQueueFlagBits Type) const
 	{
@@ -72,6 +73,8 @@ public:
 			IncrementFlightIndex();
 		}
 	}
+
+	VkPhysicalDeviceLimits DeviceLimits() const { return m_DeviceProperties.limits; }
 
 public:
 	template<typename T>

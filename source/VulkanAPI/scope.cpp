@@ -281,6 +281,7 @@ RenderScope::RenderScope()
 	_collectQueues();
 
 	m_Cache = std::make_shared<GVkResourceCache>(m_LogicalDevice);
+	vkGetPhysicalDeviceProperties(m_PhysicalDevice, &m_DeviceProperties);
 }
 
 RenderScope::~RenderScope()
