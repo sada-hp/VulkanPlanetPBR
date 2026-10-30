@@ -544,10 +544,13 @@ void GVkCommandBuffer::EndConditionalRendering()
 	}
 }
 
-void GVkCommandBuffer::Execute(const std::vector<VkCommandBuffer>& Commands)
+void GVkCommandBuffer::Execute(std::shared_ptr<GVkCommandBuffer> Commands)
 {
 	auto& object = _updateRecording();
-	vkCmdExecuteCommands(object.cmd, Commands.size(), Commands.data());
+
+	VkCommandBuffer other = Commands->GetCommandBuffer();
+	vkCmdExecuteCommands(object.cmd, 1, &other);
+	_acquire(Commands);
 }
 
 void GVkCommandBuffer::BindBarriers(const std::vector<VkBufferMemoryBarrier2>& buffers, const std::vector<VkImageMemoryBarrier2>& images)

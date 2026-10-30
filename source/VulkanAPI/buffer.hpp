@@ -59,8 +59,8 @@ public:
 	const VkBuffer& GetBuffer() const;
 
 	bool CanMap() const;
-	void UnMap();
-	void* Map();
+	void UnMap(size_t Offset = 0, size_t Size = VK_WHOLE_SIZE);
+	void* Map(size_t Offset = 0, size_t Size = VK_WHOLE_SIZE);
 
 	static std::shared_ptr<GVkBufferView> ToView(std::shared_ptr<GVkBuffer> Buffer, size_t Offset = 0, size_t Size = VK_WHOLE_SIZE);
 };
@@ -81,4 +81,7 @@ public:
 	size_t GetSize() const { return m_Size; }
 
 	std::shared_ptr<GVkBuffer> GetRoot() const { return m_Buffer; }
+
+	void UnMap();
+	void* Map();
 };

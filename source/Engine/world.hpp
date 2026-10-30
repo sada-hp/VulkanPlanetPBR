@@ -9,7 +9,14 @@
 class IWorld
 {
 private:
+	std::shared_ptr<GVkBuffer> _transformsPool = VK_NULL_HANDLE;
+	std::shared_ptr<GVkBuffer> _indirectPool = VK_NULL_HANDLE;
+
+private:
 	std::shared_ptr<GVkCommandBuffer> _syncCommandBuffer = VK_NULL_HANDLE;
+	std::shared_ptr<GVkCommandBuffer> _drawCommandBuffer = VK_NULL_HANDLE;
+
+private:
 	std::shared_ptr<GVkDescriptorSet> _transformsSet = VK_NULL_HANDLE;
 	std::shared_ptr<GVkDescriptorSet> _indirectSet = VK_NULL_HANDLE;
 	mutable bool bDescriptorsDirty = false;
@@ -40,5 +47,7 @@ public:
 
 	std::shared_ptr<GVkDescriptorSet> GetSceneTransformsSet() const;
 	std::shared_ptr<GVkDescriptorSet> GetSceneIndirectSet() const;
-	VkCommandBuffer GetPrerecorderSyncCommands() const;
+
+	std::shared_ptr<GVkCommandBuffer> GetPrerecordedSyncCommands() const;
+	std::shared_ptr<GVkCommandBuffer> GetPrerecordedDrawCommands(std::shared_ptr<GVkRenderPass> RenderPass, std::shared_ptr<GVkFramebuffer> Framebuffer, std::shared_ptr<GVkDescriptorSet> StaticSet) const;
 };

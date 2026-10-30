@@ -9,8 +9,7 @@ struct EllipsoidMatrix : public GObject
 	using TOffset = double;
 
 private:
-	std::shared_ptr<GVkBuffer> _gpuBuffer = VK_NULL_HANDLE;
-	std::shared_ptr<GVkBufferView> _gpuBufferView = VK_NULL_HANDLE;
+	std::shared_ptr<GVkBufferView> _gpuBuffer = VK_NULL_HANDLE;
 
 private:
 	const glm::vec<3, TOffset> position_base = glm::vec<3, TOffset>(0.0, GEllipsoid::Rg, 0.0);
@@ -53,10 +52,10 @@ public:
 		_update();
 	}
 
-	void InitBufferGPU(std::shared_ptr<RenderScope> Scope)
+	// temp
+	void AssignBuffer(std::shared_ptr<GVkBufferView> Buffer)
 	{
-		_gpuBuffer = GVkBufferFactory::Buffer(Scope, EBufferFlags::Host | EBufferFlags::Uniform | EBufferFlags::Vertex, sizeof(glm::mat4));
-		_gpuBufferView = GVkBuffer::ToView(_gpuBuffer);
+		_gpuBuffer = Buffer;
 	}
 
 	LocalMatrix& GetLocalMatrix()
@@ -140,7 +139,7 @@ public:
 
 	std::shared_ptr<GVkBufferView> GetBufferGPU() const
 	{
-		return _gpuBufferView;
+		return _gpuBuffer;
 	}
 
 public:

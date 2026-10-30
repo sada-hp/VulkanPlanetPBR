@@ -122,14 +122,16 @@ bool GVkBuffer::CanMap() const
 	return memFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 }
 
-void* GVkBuffer::Map()
+void* GVkBuffer::Map(size_t Offset, size_t Size)
 {
 	if (CanMap())
 	{
 		auto allocInfo = _allocationInfo();
 		auto& object = _activeObj();
 
-		vmaInvalidateAllocation(Scope->GetAllocator(), object.memory, allocInfo.offset, allocInfo.size);
+		Size = Size == VK_WHOLE_SIZE ? allocInfo.size - Offset : Size;
+
+		vmaInvalidateAllocation(Scope->GetAllocator(), object.memory, Offset, Size);
 		vmaMapMemory(Scope->GetAllocator(), object.memory, &allocInfo.pMappedData);
 
 		return allocInfo.pMappedData;
@@ -138,7 +140,7 @@ void* GVkBuffer::Map()
 	return nullptr;
 }
 
-void GVkBuffer::UnMap()
+void GVkBuffer::UnMap(size_t Offset, size_t Size)
 {
 	auto allocInfo = _allocationInfo();
 
@@ -146,7 +148,9 @@ void GVkBuffer::UnMap()
 	{
 		auto& object = _activeObj();
 		vmaUnmapMemory(Scope->GetAllocator(), object.memory);
-		vmaFlushAllocation(Scope->GetAllocator(), object.memory, allocInfo.offset, allocInfo.size);
+
+		Size = Size == VK_WHOLE_SIZE ? allocInfo.size - Offset : Size;
+		vmaFlushAllocation(Scope->GetAllocator(), object.memory, Offset, Size);
 	}
 }
 
@@ -166,4 +170,14 @@ GVkBufferView::GVkBufferView(std::shared_ptr<GVkBuffer> Buffer, size_t Offset, s
 	{
 		m_Size = Size;
 	}
+}
+
+void* GVkBufferView::Map()
+{
+	return m_Buffer->Map(m_Offset, m_Size);
+}
+
+void GVkBufferView::UnMap()
+{
+	m_Buffer->UnMap(m_Offset, m_Size);
 }

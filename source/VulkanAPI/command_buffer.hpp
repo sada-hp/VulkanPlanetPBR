@@ -109,7 +109,7 @@ public:
 	void SetRenderArea(const VkRect2D& Scissor, const VkViewport& Viewport);
 	void NextSubpass();
 
-	void Execute(const std::vector<VkCommandBuffer>& Commands);
+	void Execute(std::shared_ptr<GVkCommandBuffer> Commands);
 
 public:
 	template<std::derived_from<GVkBarrier> BarrierType, typename T, typename ...Args>

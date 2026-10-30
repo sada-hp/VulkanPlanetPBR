@@ -14,7 +14,9 @@ struct GDrawable : public IComponent
 
 private:
 	std::shared_ptr<GVkCommandBuffer> _commandBuffer = VK_NULL_HANDLE;
-	std::shared_ptr<GVkIndirectData> _drawCall = VK_NULL_HANDLE;
+	// std::shared_ptr<GVkIndirectData> _drawCall = VK_NULL_HANDLE;
+	std::shared_ptr<GVkBufferView> _indirectCallView;
+	std::shared_ptr<GVkBufferView> _conditionalView;
 
 public:
 	std::shared_ptr<IMesh> Mesh = nullptr;
@@ -23,7 +25,6 @@ public:
 private:
 	void init_static_calls()
 	{
-		_drawCall = std::make_shared<GVkIndirectData>(Mesh->GetScope(), Mesh);
 		_commandBuffer = std::make_shared<GVkCommandBuffer>(Mesh->GetScope(), VK_QUEUE_GRAPHICS_BIT, ECmdFlags::InFlight | ECmdFlags::Secondary);
 	}
 
@@ -34,7 +35,7 @@ private:
 		{
 			_commandBuffer->BeginRenderPass(RenderPass, Framebuffer);
 
-			_commandBuffer->BeginConditionalRendering(_drawCall->ConditionalBuffer());
+			_commandBuffer->BeginConditionalRendering(_conditionalView);
 			{
 				_commandBuffer->BindVertexBuffer(0, Mesh->VertexBuffer());
 				_commandBuffer->BindVertexBuffer(1, TransformView);
@@ -53,9 +54,9 @@ private:
 						_commandBuffer->BindDescriptorSet(1, descriptorset);
 
 					if (IsIndexed)
-						_commandBuffer->DrawIndirectIndexed(_drawCall->IndirectBuffer());
+						_commandBuffer->DrawIndirectIndexed(_indirectCallView);
 					else
-						_commandBuffer->DrawIndirect(_drawCall->IndirectBuffer());
+						_commandBuffer->DrawIndirect(_indirectCallView);
 				}
 			}
 			_commandBuffer->EndConditionalRendering();
@@ -89,10 +90,5 @@ public:
 
 	virtual ~GDrawable()
 	{
-	}
-
-	std::shared_ptr<GVkIndirectData> GetIndirectData()
-	{
-		return _drawCall;
 	}
 };

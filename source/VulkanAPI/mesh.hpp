@@ -42,6 +42,25 @@ public:
 	{
 		return Scope;
 	}
+
+	VkDrawIndexedIndirectCommand GetDrawCommand()
+	{
+		VkDrawIndexedIndirectCommand cmd{};
+		if (m_IndexCount > 0)
+		{
+			cmd = {
+				m_IndexCount, 1, 0, 0, 0
+			};
+		}
+		else
+		{
+			cmd = {
+				m_VertexCount, 1, 0, 0, 0
+			};
+		}
+
+		return cmd;
+	}
 };
 
 template<typename VertexType> 

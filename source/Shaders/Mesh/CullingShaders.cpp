@@ -2,21 +2,26 @@
 
 ShaderCodeDefinition(GShaders::CullCS)
 (
+	struct DrawCommand
+	{
+		uint indexCount;
+		uint instanceCount;
+		uint firstIndex;
+		uint vertexOffset;
+		uint firstInstance;
+	};
+
 	layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 
 	layout(set = 0, binding = 0) writeonly buffer indirectDraw 
 	{
-		uint    indexCount;
-		uint    instanceCount;
-		uint    firstIndex;
-		uint    vertexOffset;
-		uint    firstInstance;
-	} commands[];
+		DrawCommand at[];
+	} commands;
 
-	layout(set = 1, binding = 0) uniform transform
+	layout(set = 1, binding = 0) readonly buffer transform
 	{
-		mat4 world;
-	} transforms[];
+		mat4 at[];
+	} matrices;
 
 	layout(push_constant) uniform constants {
 		// frustum
@@ -44,8 +49,9 @@ ShaderCodeDefinition(GShaders::CullCS)
 	{
 		if (gl_GlobalInvocationID.x < data.invocations)
 		{
-			mat4 tm = transforms[gl_GlobalInvocationID.x].world;
-			commands[gl_GlobalInvocationID.x].instanceCount = frustumCull(tm);
+			mat4 tm = matrices.at[gl_GlobalInvocationID.x];
+			// commands.at[gl_GlobalInvocationID.x].instanceCount = frustumCull(tm);
+			commands.at[gl_GlobalInvocationID.x].instanceCount = 1;
 		}
 	}
 );

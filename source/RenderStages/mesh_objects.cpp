@@ -75,20 +75,11 @@ void GMeshStage::Execute(const GCamera& Camera, const IWorld& World)
 	VkRect2D Scissor = Framebuffer->GetRenderArea();
 	VkViewport Viewport = { 0, 0, Scissor.extent.width, Scissor.extent.height, 0.0, 1.0 };
 
-	CommandBuffer->Execute({ World.GetPrerecorderSyncCommands() });
+	CommandBuffer->Execute(World.GetPrerecordedSyncCommands());
 
 	CommandBuffer->BeginRenderPass(RenderPass, Framebuffer, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
-	std::vector<VkCommandBuffer> _commands;
-	_commands.reserve(view.size_hint());
-
-	for (const auto& [ent, matrix, object] : view.each())
-	{
-		VkCommandBuffer subCommand = object._getPrerecordedCommands(RenderPass, Framebuffer, matrix.GetBufferGPU(), Descriptors.Draw);
-		_commands.emplace_back(subCommand);
-	}
-
-	CommandBuffer->Execute(_commands);
+	CommandBuffer->Execute(World.GetPrerecordedDrawCommands(RenderPass, Framebuffer, Descriptors.Draw));
 
 	CommandBuffer->NextSubpass();
 

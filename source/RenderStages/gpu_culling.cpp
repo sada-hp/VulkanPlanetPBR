@@ -4,11 +4,11 @@ GCullingStage::GCullingStage(std::shared_ptr<RenderScope> Scope)
 	: IRenderStage(Scope, VK_QUEUE_GRAPHICS_BIT)
 {
 	DescriptorLayoutDescriptor DSLDescIndirect;
-	DSLDescIndirect.AddStorageBuffer(VK_SHADER_STAGE_COMPUTE_BIT, true);
+	DSLDescIndirect.AddStorageBuffer(VK_SHADER_STAGE_COMPUTE_BIT);
 	auto LayoutIndirect = DSLDescIndirect.Construct(Scope);
 
 	DescriptorLayoutDescriptor DSLDescTransform;
-	DSLDescTransform.AddUniformBuffer(VK_SHADER_STAGE_COMPUTE_BIT, true);
+	DSLDescTransform.AddStorageBuffer(VK_SHADER_STAGE_COMPUTE_BIT);
 	auto LayoutTransform = DSLDescTransform.Construct(Scope);
 
 	ComputePipelineDescriptor CSODesc{};
