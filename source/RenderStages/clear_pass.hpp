@@ -5,7 +5,7 @@
 class GAttachmentsClear : public IRenderStage
 {
 public:
-	GAttachmentsClear(std::shared_ptr<RenderScope> Scope, const GVkSharedResources& Resources);
+	GAttachmentsClear(std::shared_ptr<RenderScope> Scope);
 	virtual ~GAttachmentsClear();
 	void Execute(const GCamera& Camera, const IWorld& World) override;
 };

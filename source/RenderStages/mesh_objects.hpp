@@ -26,11 +26,11 @@ private:
 	} Descriptors;
 
 private:
-	void _initDrawPass(const GVkSharedResources& Resources);
-	void _initCompositePass(const GVkSharedResources& Resources);
+	void _initDrawPass();
+	void _initCompositePass();
 
 public:
-	GMeshStage(std::shared_ptr<RenderScope> Scope, const GVkSharedResources& Resources);
+	GMeshStage(std::shared_ptr<RenderScope> Scope);
 	virtual ~GMeshStage();
 
 	void Execute(const GCamera& Camera, const IWorld& World) override;

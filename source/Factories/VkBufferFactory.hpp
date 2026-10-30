@@ -10,7 +10,19 @@ namespace GVkBufferFactory
 		if (Data)
 		{
 			std::shared_ptr<GVkCommandBuffer> _cmd = std::make_shared<GVkCommandBuffer>(Scope, VK_QUEUE_GRAPHICS_BIT);
-			_cmd->UpdateBuffer(GVkBuffer::ToView(_buffer), (char*)Data);
+			auto view = GVkBuffer::ToView(_buffer);
+
+			if (_buffer->IsInFlight())
+			{
+				Scope->ExecuteForAllFrames([_cmd, view, Data]()
+				{
+					_cmd->UpdateBuffer(view, (char*)Data);
+				});
+			}
+			else
+			{
+				_cmd->UpdateBuffer(view, (char*)Data);
+			}
 		}
 
 		return _buffer;
@@ -58,12 +70,12 @@ namespace GVkBufferFactory
 
 	inline std::shared_ptr<GVkBuffer> IndirectBuffer(std::shared_ptr<RenderScope> Scope, size_t Size, void* Data = nullptr)
 	{
-		return Buffer(Scope, EBufferFlags::Indirect, Size, Data);
+		return Buffer(Scope, EBufferFlags::Conditional | EBufferFlags::Storage | EBufferFlags::Indirect, Size, Data);
 	}
 
 	inline std::shared_ptr<GVkBuffer> IndirectBufferFlight(std::shared_ptr<RenderScope> Scope, size_t Size, void* Data = nullptr)
 	{
-		return Buffer(Scope, EBufferFlags::Indirect | EBufferFlags::InFlight, Size, Data);
+		return Buffer(Scope, EBufferFlags::Conditional | EBufferFlags::Storage | EBufferFlags::Indirect | EBufferFlags::InFlight, Size, Data);
 	}
 	
 	inline std::shared_ptr<GVkBuffer> StagingBuffer(std::shared_ptr<RenderScope> Scope, size_t Size, void* Data = nullptr)

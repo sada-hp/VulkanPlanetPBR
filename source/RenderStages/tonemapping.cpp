@@ -1,17 +1,17 @@
 #include "tonemapping.hpp"
 #include "Factories/VkSamplerFactory.hpp"
 
-GTonemapStage::GTonemapStage(std::shared_ptr<RenderScope> InScope, const GVkSharedResources& Resources)
+GTonemapStage::GTonemapStage(std::shared_ptr<RenderScope> InScope)
 	: IRenderStage(InScope, VK_QUEUE_GRAPHICS_BIT)
 {
 	RenderPassDescriptor RPDesc{};
-	RPDesc.AddAttachmentDontCareOp(Resources.FinalTarget->GetFormat());
+	RPDesc.AddAttachmentDontCareOp(GVkSharedResources::Instance.FinalTarget->GetFormat());
 	RenderPass = RPDesc.Construct(Scope);
 
-	Framebuffer = std::make_shared<GVkFramebuffer>(Scope, RenderPass, std::vector{ GVkImage::ToView(Resources.FinalTarget) });
+	Framebuffer = std::make_shared<GVkFramebuffer>(Scope, RenderPass, std::vector{ GVkImage::ToView(GVkSharedResources::Instance.FinalTarget) });
 
 	DescriptorSetDescriptor DSDesc{};
-	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Resources.ColorBuffer), GVkSamplerFactory::PointSamplerClamp(Scope));
+	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(GVkSharedResources::Instance.ColorBuffer), GVkSamplerFactory::PointSamplerClamp(Scope));
 	DescriptorSet = DSDesc.Allocate(Scope);
 
 	GraphicsPipelineDescriptor PSODesc{};

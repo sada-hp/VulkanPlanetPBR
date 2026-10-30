@@ -63,6 +63,16 @@ public:
 		return m_Queues.at(VK_QUEUE_GRAPHICS_BIT);
 	}
 
+	void ExecuteForAllFrames(const std::function<void()>& f)
+	{
+		for (uint32_t idx = 0; idx < GetMaxFramesInFlight(); idx++)
+		{
+			f();
+
+			IncrementFlightIndex();
+		}
+	}
+
 public:
 	template<typename T>
 	decltype(auto) GetCache(const T& Object)

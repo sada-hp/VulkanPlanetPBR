@@ -47,6 +47,9 @@ GVkBuffer::GVkBuffer(std::shared_ptr<RenderScope> InScope, size_t Size, EBufferF
 	if (CheckFlag(Flags, EBufferFlags::TransferSrc))
 		createInfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
+	if (CheckFlag(Flags, EBufferFlags::Conditional))
+		createInfo.usage |= VK_BUFFER_USAGE_CONDITIONAL_RENDERING_BIT_EXT;
+
 	if (CheckFlag(Flags, EBufferFlags::Concurent))
 	{
 		createInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
@@ -113,11 +116,15 @@ const VkBuffer& GVkBuffer::GetBuffer() const
 	return object.buffer;
 }
 
-void* GVkBuffer::Map()
+bool GVkBuffer::CanMap() const
 {
 	auto memFlags = _memoryFlags();
+	return memFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+}
 
-	if (memFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+void* GVkBuffer::Map()
+{
+	if (CanMap())
 	{
 		auto allocInfo = _allocationInfo();
 		auto& object = _activeObj();

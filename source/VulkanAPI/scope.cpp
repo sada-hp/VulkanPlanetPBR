@@ -7,7 +7,7 @@
 
 void RenderScope::_createDevice()
 {
-	std::vector<const char*> extensionsList = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+	std::vector<const char*> extensionsList = { VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_EXT_CONDITIONAL_RENDERING_EXTENSION_NAME };
 
 	auto enumerateExtensions = [extensionsList](const VkPhysicalDevice& physicalDevice)
 	{
@@ -47,7 +47,8 @@ void RenderScope::_createDevice()
 
 bool RenderScope::_createLogicalDevice(VkPhysicalDevice physicalDevice, const std::vector<const char*>& device_extensions)
 {
-	VkPhysicalDeviceSynchronization2Features availableSynchronization2Features{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES };
+	VkPhysicalDeviceConditionalRenderingFeaturesEXT availableconditionalRenderinFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES };
+	VkPhysicalDeviceSynchronization2Features availableSynchronization2Features{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES, &availableconditionalRenderinFeatures };
 	VkPhysicalDeviceVulkan12Features availableFeaturesVk12{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES, &availableSynchronization2Features };
 	VkPhysicalDeviceFeatures2 availableFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, &availableFeaturesVk12 };
 	vkGetPhysicalDeviceFeatures2(physicalDevice, &availableFeatures);
@@ -61,17 +62,26 @@ bool RenderScope::_createLogicalDevice(VkPhysicalDevice physicalDevice, const st
 		availableFeatures.features.multiDrawIndirect                    != VK_TRUE ||
 		availableFeaturesVk12.drawIndirectCount                         != VK_TRUE ||
 		availableFeaturesVk12.runtimeDescriptorArray                    != VK_TRUE ||
+		availableFeaturesVk12.descriptorBindingVariableDescriptorCount  != VK_TRUE ||
+		availableFeaturesVk12.descriptorBindingPartiallyBound           != VK_TRUE ||
 		availableFeaturesVk12.shaderSampledImageArrayNonUniformIndexing != VK_TRUE ||
+		availableconditionalRenderinFeatures.conditionalRendering       != VK_TRUE ||
 		availableSynchronization2Features.synchronization2              != VK_TRUE)
 	{
 		return false;
 	}
 
-	VkPhysicalDeviceSynchronization2Features synchronization2Features{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES };
+	VkPhysicalDeviceConditionalRenderingFeaturesEXT conditionalRenderingFeatures{};
+	conditionalRenderingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CONDITIONAL_RENDERING_FEATURES_EXT;
+	conditionalRenderingFeatures.conditionalRendering = VK_TRUE;
+
+	VkPhysicalDeviceSynchronization2Features synchronization2Features{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES, &conditionalRenderingFeatures };
 	synchronization2Features.synchronization2 = VK_TRUE;
 
 	VkPhysicalDeviceVulkan12Features featureVk12{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES, &synchronization2Features };
 	featureVk12.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+	featureVk12.descriptorBindingVariableDescriptorCount = VK_TRUE;
+	featureVk12.descriptorBindingPartiallyBound = VK_TRUE;
 	featureVk12.runtimeDescriptorArray = VK_TRUE;
 	featureVk12.drawIndirectCount = VK_TRUE;
 

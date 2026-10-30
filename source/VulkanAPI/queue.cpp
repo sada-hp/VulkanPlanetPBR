@@ -27,6 +27,16 @@ void Queue::allocateCommandBuffer(VkCommandBuffer* cmd) const
 	vkAllocateCommandBuffers(m_vkDevice, &allocInfo, cmd);
 }
 
+void Queue::allocateCommandBuffer2(VkCommandBuffer* cmd) const
+{
+	VkCommandBufferAllocateInfo allocInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
+	allocInfo.commandPool = m_CmdPool;
+	allocInfo.commandBufferCount = 1;
+
+	vkAllocateCommandBuffers(m_vkDevice, &allocInfo, cmd);
+}
+
 void Queue::freeCommandBuffer(VkCommandBuffer cmd) const
 {
 	vkFreeCommandBuffers(m_vkDevice, m_CmdPool, 1, &cmd);

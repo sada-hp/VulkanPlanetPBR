@@ -1,4 +1,5 @@
 #pragma once
+#include "Factories/VkBufferFactory.hpp"
 #include "EllipsoidMath.hpp"
 #include "WorldMatrix.hpp"
 
@@ -6,6 +7,10 @@ struct EllipsoidMatrix : public GObject
 {
 	using TRotation = float;
 	using TOffset = double;
+
+private:
+	std::shared_ptr<GVkBuffer> _gpuBuffer = VK_NULL_HANDLE;
+	std::shared_ptr<GVkBufferView> _gpuBufferView = VK_NULL_HANDLE;
 
 private:
 	const glm::vec<3, TOffset> position_base = glm::vec<3, TOffset>(0.0, GEllipsoid::Rg, 0.0);
@@ -24,6 +29,13 @@ private:
 		matrix = glm::mat<4, 4, TOffset>(orientation_base * local_offset.GetOrientation());
 		matrix[3] = glm::vec<4, TOffset>(p, 1.0);
 
+		if (_gpuBuffer)
+		{
+			glm::mat4 _compressed = matrix;
+			memcpy(_gpuBuffer->Map(), &_compressed, sizeof(_compressed));
+			_gpuBuffer->UnMap();
+		}
+
 		invokeChange();
 	}
 
@@ -39,6 +51,12 @@ public:
 
 		local_offset.onChange(this, &EllipsoidMatrix::_update);
 		_update();
+	}
+
+	void InitBufferGPU(std::shared_ptr<RenderScope> Scope)
+	{
+		_gpuBuffer = GVkBufferFactory::Buffer(Scope, EBufferFlags::Host | EBufferFlags::Uniform | EBufferFlags::Vertex, sizeof(glm::mat4));
+		_gpuBufferView = GVkBuffer::ToView(_gpuBuffer);
 	}
 
 	LocalMatrix& GetLocalMatrix()
@@ -120,6 +138,12 @@ public:
 		return matrix;
 	}
 
+	std::shared_ptr<GVkBufferView> GetBufferGPU() const
+	{
+		return _gpuBufferView;
+	}
+
+public:
 	template<typename Type = TOffset>
 	EllipsoidMatrix& LookAt(const glm::vec<3, Type>& target)
 	{

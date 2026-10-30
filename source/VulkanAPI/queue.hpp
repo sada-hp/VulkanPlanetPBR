@@ -16,6 +16,7 @@ public:
 	const uint32_t& GetFamilyIndex() const { return m_familyIndex; };
 	const VkQueue& GetQueue() const { return m_vkQueue; };
 
+	void allocateCommandBuffer2(VkCommandBuffer* cmd) const;
 	void allocateCommandBuffer(VkCommandBuffer* cmd) const;
 	void freeCommandBuffer(VkCommandBuffer cmd) const;
 

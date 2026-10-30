@@ -10,12 +10,14 @@
 #include "render_pass.hpp"
 #include "descriptor_set.hpp"
 
+#include <unordered_set>
 #include <concepts>
 
 enum class ECmdFlags
 {
 	Default  = 0,
-	InFlight = Bit(0)
+	InFlight  = Bit(0),
+	Secondary = Bit(1)
 };
 
 DefineFlags(ECmdFlags)
@@ -27,28 +29,36 @@ class GVkCommandBuffer : public IVkObj
 		VkCommandBuffer cmd = VK_NULL_HANDLE;
 		std::shared_ptr<GVkFence> fence = VK_NULL_HANDLE;
 
+		bool bRecorded = false;
 		bool bRecording = false;
 		uint32_t activeSubpass = 0;
 		std::shared_ptr<GVkPipeline> pipeline = VK_NULL_HANDLE;
 		std::shared_ptr<GVkRenderPass> renderPass = VK_NULL_HANDLE;
 		std::shared_ptr<GVkFramebuffer> framebuffer = VK_NULL_HANDLE;
-
 		std::vector<std::shared_ptr<IVkObj>> acquired_resources;
 	};
 
 private:
+	PFN_vkCmdBeginConditionalRenderingEXT vkCmdBeginConditionalRendering;
+	PFN_vkCmdEndConditionalRenderingEXT vkCmdEndConditionalRendering;
+
+private:
 	std::shared_ptr<RenderScope> Scope = VK_NULL_HANDLE;
 	std::vector<_internalObj> m_flightResources = {};
+
+	ECmdFlags m_cmdFlags = ECmdFlags::Default;
 	VkQueueFlagBits m_qFlags;
 
 private:
 	size_t _activeIndex() const { return Scope->GetResourceIndex() % m_flightResources.size(); }
-	const _internalObj& _activeObj() const { return m_flightResources.at(_activeIndex()); }
-	_internalObj& _activeObj() { return m_flightResources.at(_activeIndex()); }
+	const _internalObj& _activeObj() const { return m_flightResources[_activeIndex()]; }
+	_internalObj& _activeObj() { return m_flightResources[_activeIndex()]; }
 
 private:
 	void _submitRecording(_internalObj& object);
-	_internalObj& _updateRecording();
+	void _acquire(std::shared_ptr<IVkObj> obj);
+	
+	_internalObj& _updateRecording(const VkCommandBufferInheritanceInfo* inheritance = VK_NULL_HANDLE);
 	void _nextSubpass();
 
 public:
@@ -56,6 +66,8 @@ public:
 	~GVkCommandBuffer();
 
 	VkCommandBuffer GetCommandBuffer();
+
+	bool IsRecorded();
 
 	void Wait();
 	void Submit();
@@ -67,20 +79,37 @@ public:
 	void CopyBuffer(std::shared_ptr<GVkBufferView> BufferSrc, std::shared_ptr<GVkImageView> ImageDst);
 
 	void GenerateMipMaps(std::shared_ptr<GVkImage> Image);
+
+	void ClearBuffer(std::shared_ptr<GVkBufferView> View, uint32_t Value);
 	void ClearImage(std::shared_ptr<GVkImageView> View, VkClearColorValue ClearValue);
 	void ClearImage(std::shared_ptr<GVkImageView> View, VkClearDepthStencilValue ClearValue);
 
-	void BeginRenderPass(std::shared_ptr<GVkRenderPass> RenderPass, std::shared_ptr<GVkFramebuffer> Framebuffer);
+	void BeginRenderPass(std::shared_ptr<GVkRenderPass> RenderPass, std::shared_ptr<GVkFramebuffer> Framebuffer, VkSubpassContents Contents = VK_SUBPASS_CONTENTS_INLINE);
 	void EndRenderPass();
 
 	void BindPipeline(std::shared_ptr<GVkPipeline> Pipeline);
 	void BindDescriptorSet(uint32_t Slot, std::shared_ptr<GVkDescriptorSet> Set);
 
 	void Draw(uint32_t VertexCount, uint32_t InstanceCount = 1u, uint32_t BaseVertex = 0u, uint32_t BaseInstance = 0u);
+	void Dispatch(uint32_t X, uint32_t Y, uint32_t Z);
 
 	void BindVertexBuffer(uint32_t Slot, std::shared_ptr<GVkBufferView> Buffer);
 	void BindIndexBuffer(VkIndexType Type, std::shared_ptr<GVkBufferView> Buffer);
 	void DrawIndexed(uint32_t Count, uint32_t InstanceCount = 1u, uint32_t BaseVertex = 0u, uint32_t FirstIndex = 0u, uint32_t BaseInstance = 0u);
+
+	void DrawIndirectCount(std::shared_ptr<GVkBuffer> IndirectBuffer, std::shared_ptr<GVkBuffer> CountBuffer, size_t CountOffset, uint32_t MaxCounts = 1, uint32_t Stride = sizeof(VkDrawIndirectCommand));
+	void DrawIndirectIndexedCount(std::shared_ptr<GVkBuffer> IndirectBuffer, std::shared_ptr<GVkBuffer> CountBuffer, size_t CountOffset, uint32_t MaxCounts = 1, uint32_t Stride = sizeof(VkDrawIndexedIndirectCommand));
+	
+	void DrawIndirect(std::shared_ptr<GVkBufferView> IndirectBuffer);
+	void DrawIndirectIndexed(std::shared_ptr<GVkBufferView> IndirectBuffer);
+
+	void BeginConditionalRendering(std::shared_ptr<GVkBufferView> Buffer);
+	void EndConditionalRendering();
+
+	void SetRenderArea(const VkRect2D& Scissor, const VkViewport& Viewport);
+	void NextSubpass();
+
+	void Execute(const std::vector<VkCommandBuffer>& Commands);
 
 public:
 	template<std::derived_from<GVkBarrier> BarrierType, typename T, typename ...Args>
@@ -91,7 +120,7 @@ public:
 		BarrierType Barrier(target, args...);
 		Barrier.Bind(object.cmd);
 
-		object.acquired_resources.emplace_back(target);
+		_acquire(target);
 	}
 
 	template<typename T>

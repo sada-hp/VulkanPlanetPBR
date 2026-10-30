@@ -21,6 +21,8 @@ GVkPipeline::GVkPipeline(std::shared_ptr<RenderScope> InScope, VkPipelineLayoutC
 	, m_bindPoint(VK_PIPELINE_BIND_POINT_COMPUTE)
 {
 	vkCreatePipelineLayout(Scope->GetDevice(), &LayoutInfo, VK_NULL_HANDLE, &m_pipelineLayout);
+
+	pushConstants = std::vector(LayoutInfo.pPushConstantRanges, LayoutInfo.pPushConstantRanges + LayoutInfo.pushConstantRangeCount);
 	CreateInfo.layout = m_pipelineLayout;
 
 	auto res = vkCreateComputePipelines(Scope->GetDevice(), Cache, 1, &CreateInfo, VK_NULL_HANDLE, &m_pipeline);
@@ -40,15 +42,17 @@ std::string ComputePipelineDescriptor::HashString() const
 
 std::shared_ptr<GVkPipeline> ComputePipelineDescriptor::Construct(std::shared_ptr<RenderScope> Scope)
 {
-	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
-	pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
 	pipelineLayoutCreateInfo.setLayoutCount = descriptorLayouts.size();
 	pipelineLayoutCreateInfo.pSetLayouts = descriptorLayouts.data();
 	pipelineLayoutCreateInfo.pushConstantRangeCount = pushConstants.size();
 	pipelineLayoutCreateInfo.pPushConstantRanges = pushConstants.data();
 
 	VkComputePipelineCreateInfo pipelineCreateInfo{ VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
+	pipelineCreateInfo.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	pipelineCreateInfo.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
 	pipelineCreateInfo.stage.module = Scope->GetCache(CS);
+	pipelineCreateInfo.stage.pName = "main";
 
 	return std::make_shared<GVkPipeline>(Scope, pipelineLayoutCreateInfo, pipelineCreateInfo, Scope->GetCache(*this));
 }

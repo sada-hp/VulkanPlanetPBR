@@ -2,17 +2,15 @@
 #include "Factories/VkImageFactory.hpp"
 #include "Factories/VkSamplerFactory.hpp"
 
-GCloudsStage::GCloudsStage(std::shared_ptr<RenderScope> Scope, const GVkSharedResources& Resources)
+GCloudsStage::GCloudsStage(std::shared_ptr<RenderScope> Scope)
 	: IRenderStage(Scope, VK_QUEUE_GRAPHICS_BIT)
 {
 	Images.PerlinWorley = _generate_noise(GShaderNoise::PerlinWorleyPS, VK_FORMAT_R16_SFLOAT, VkExtent3D{ 128, 128, 128 }, 8, 5);
 	Images.HighFrequency = _generate_noise(GShaderNoise::WorleyPS, VK_FORMAT_R16G16B16A16_SFLOAT, VkExtent3D{ 64, 64, 64 }, 6, 3);
 
-	VkExtent2D ExtentLR = { Resources.ColorBuffer->GetExtent().width / 2, Resources.ColorBuffer->GetExtent().height / 2 };
+	VkExtent2D ExtentLR = { GVkSharedResources::Instance.ColorBuffer->GetExtent().width / 2, GVkSharedResources::Instance.ColorBuffer->GetExtent().height / 2 };
 	Images.CloudsLR = GVkImageFactory::ColorRenderTargetFlight(Scope, ExtentLR);
 	Images.DepthLR = GVkImageFactory::DepthRenderTargetFlight(Scope, ExtentLR);
-	Images.ColorHR = Resources.ColorBuffer;
-	Images.DepthHR = Resources.DepthBuffer;
 
 	RenderPassDescriptor RPDesc{};
 	RPDesc.AddAttachmentClearOp(Images.CloudsLR->GetFormat(), VkClearValue{}, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
@@ -22,10 +20,10 @@ GCloudsStage::GCloudsStage(std::shared_ptr<RenderScope> Scope, const GVkSharedRe
 	Framebuffer = std::make_shared<GVkFramebuffer>(Scope, RenderPass, std::vector{ Images.CloudsLR, Images.DepthLR });
 
 	DescriptorSetDescriptor DSDesc{};
-	DSDesc.AddUniformBuffer(VK_SHADER_STAGE_FRAGMENT_BIT, GVkBuffer::ToView(Resources.UBO));
-	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Resources.IrradianceLUT), GVkSamplerFactory::LinearSamplerRepeat(Scope));
-	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Resources.ScatteringLUT), GVkSamplerFactory::LinearSamplerRepeat(Scope));
-	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Resources.TransmittanceLUT), GVkSamplerFactory::LinearSamplerRepeat(Scope));
+	DSDesc.AddUniformBuffer(VK_SHADER_STAGE_FRAGMENT_BIT, GVkBuffer::ToView(GVkSharedResources::Instance.UBO));
+	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(GVkSharedResources::Instance.IrradianceLUT), GVkSamplerFactory::LinearSamplerRepeat(Scope));
+	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(GVkSharedResources::Instance.ScatteringLUT), GVkSamplerFactory::LinearSamplerRepeat(Scope));
+	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(GVkSharedResources::Instance.TransmittanceLUT), GVkSamplerFactory::LinearSamplerRepeat(Scope));
 	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Images.PerlinWorley), GVkSamplerFactory::LinearSamplerRepeat(Scope));
 	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Images.HighFrequency), GVkSamplerFactory::LinearSamplerRepeat(Scope));
 	DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToFlightHadle(Images.CloudsLR, -1), GVkSamplerFactory::PointSamplerClamp(Scope));
@@ -173,7 +171,7 @@ void GCloudsStage::Execute(const GCamera& Camera, const IWorld& World)
 	CommandBuffer->EndRenderPass();
 
 	auto view = GVkImage::ToView(Images.CloudsLR);
-	CommandBuffer->BlitImage(view, GVkImage::ToView(Images.ColorHR));
+	CommandBuffer->BlitImage(view, GVkImage::ToView(GVkSharedResources::Instance.ColorBuffer));
 	CommandBuffer->BindBarrier<GVkShaderReadBarrier>(view, VK_SHADER_STAGE_FRAGMENT_BIT);
 
 	CommandBuffer->Submit();

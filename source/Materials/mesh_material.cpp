@@ -14,7 +14,6 @@ GMeshMaterial::GMeshMaterial(std::shared_ptr<RenderScope> Scope, const MaterialD
 	std::shared_ptr<GVkDescriptorSetLayout> Layout = DSLDesc.Construct(Scope);
 
 	GraphicsPipelineDescriptor PSODesc{};
-	PSODesc.AddPushConstants<glm::mat4>(VK_SHADER_STAGE_VERTEX_BIT);
 	PSODesc.AddDescriptorLayout(Layout->GetLayout());
 	PSODesc.SetRenderPass(RenderPass);
 	PSODesc.SetVertexAttributeBindings(MeshVertex::getAttributeDescriptions())

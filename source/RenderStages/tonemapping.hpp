@@ -11,7 +11,7 @@ private:
 	std::shared_ptr<GVkDescriptorSet> DescriptorSet = VK_NULL_HANDLE;
 
 public:
-	GTonemapStage(std::shared_ptr<RenderScope> Scope, const GVkSharedResources& Resources);
+	GTonemapStage(std::shared_ptr<RenderScope> Scope);
 	virtual ~GTonemapStage();
 	void Execute(const GCamera& Camera, const IWorld& World) override;
 };

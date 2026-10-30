@@ -1,16 +1,16 @@
 #include "clear_pass.hpp"
 
-GAttachmentsClear::GAttachmentsClear(std::shared_ptr<RenderScope> Scope, const GVkSharedResources& Resources)
+GAttachmentsClear::GAttachmentsClear(std::shared_ptr<RenderScope> Scope)
 	: IRenderStage(Scope, VK_QUEUE_GRAPHICS_BIT)
 {
 	RenderPassDescriptor RPDesc;
-	RPDesc.AddAttachmentClearOp(Resources.ColorBuffer->GetFormat());
-	RPDesc.AddAttachmentClearOp(Resources.DepthBuffer->GetFormat());
+	RPDesc.AddAttachmentClearOp(GVkSharedResources::Instance.ColorBuffer->GetFormat());
+	RPDesc.AddAttachmentClearOp(GVkSharedResources::Instance.DepthBuffer->GetFormat());
 	RenderPass = RPDesc.Construct(Scope);
 
 	Framebuffer = std::make_shared<GVkFramebuffer>(Scope, RenderPass, std::vector{
-		GVkImage::ToView(Resources.ColorBuffer),
-		GVkImage::ToView(Resources.DepthBuffer)
+		GVkImage::ToView(GVkSharedResources::Instance.ColorBuffer),
+		GVkImage::ToView(GVkSharedResources::Instance.DepthBuffer)
 	});
 }
 

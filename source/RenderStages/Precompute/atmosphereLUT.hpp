@@ -32,23 +32,23 @@ private:
 	} Images;
 
 private:
-	GLutPass _addIrradiancePass(GVkSharedResources& Resources);
-	GLutPass _addTransmittancePass(GVkSharedResources& Resources);
-	GLutPass _addIrradianceMultiStep(GVkSharedResources& Resources);
-	GLutPass _addSingleScatteringPass(GVkSharedResources& Resources);
-	GLutPass _addSingleScatteringCopyPass(GVkSharedResources& Resources);
+	GLutPass _addIrradiancePass();
+	GLutPass _addTransmittancePass();
+	GLutPass _addIrradianceMultiStep();
+	GLutPass _addSingleScatteringPass();
+	GLutPass _addSingleScatteringCopyPass();
 
-	GLutPass _addScatteringMultiEvalStep(GVkSharedResources& Resources);
-	GLutPass _addScatteringMultiAddStep(GVkSharedResources& Resources);
+	GLutPass _addScatteringMultiEvalStep();
+	GLutPass _addScatteringMultiAddStep();
 
-	void _initImages(GVkSharedResources& Resources);
+	void _initImages();
 
-	GAtmospherePrecomputeLUT(std::shared_ptr<RenderScope> Scope, GVkSharedResources& Resources);
+	GAtmospherePrecomputeLUT(std::shared_ptr<RenderScope> Scope);
 	virtual ~GAtmospherePrecomputeLUT() {}
 	
 	void _executePass(std::shared_ptr<GVkCommandBuffer> CommandBuffer, GLutPass& pass);
 	void _runPrecompute();
 
 public:
-	static void Execute(std::shared_ptr<RenderScope> Scope, GVkSharedResources& Resources);
+	static void Execute(std::shared_ptr<RenderScope> Scope);
 };

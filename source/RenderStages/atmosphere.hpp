@@ -11,7 +11,7 @@ private:
 	std::shared_ptr<GVkDescriptorSet> DescriptorSet = VK_NULL_HANDLE;
 
 public:
-	GAtmosphereStage(std::shared_ptr<RenderScope> Scope, const GVkSharedResources& Resources);
+	GAtmosphereStage(std::shared_ptr<RenderScope> Scope);
 	virtual ~GAtmosphereStage();
 	void Execute(const GCamera& Camera, const IWorld& World) override;
 };

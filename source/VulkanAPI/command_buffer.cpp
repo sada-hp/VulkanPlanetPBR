@@ -1,7 +1,7 @@
 #include "command_buffer.hpp"
 
 GVkCommandBuffer::GVkCommandBuffer(std::shared_ptr<RenderScope> InScope, VkQueueFlagBits Queue, ECmdFlags Flags)
-	: Scope(InScope), m_qFlags(Queue)
+	: Scope(InScope), m_qFlags(Queue), m_cmdFlags(Flags)
 {
 	if (CheckFlag(Flags, ECmdFlags::InFlight))
 		m_flightResources.resize(Scope->GetMaxFramesInFlight());
@@ -13,9 +13,16 @@ GVkCommandBuffer::GVkCommandBuffer(std::shared_ptr<RenderScope> InScope, VkQueue
 
 	for (auto& object : m_flightResources)
 	{
-		Scope->GetQueue(m_qFlags).allocateCommandBuffer(&object.cmd);
+		if (CheckFlag(m_cmdFlags, ECmdFlags::Secondary))
+			Scope->GetQueue(m_qFlags).allocateCommandBuffer2(&object.cmd);
+		else
+			Scope->GetQueue(m_qFlags).allocateCommandBuffer(&object.cmd);
+
 		object.fence = std::make_shared<GVkFence>(Scope, EFenceFlags::CreateSignaled);
 	}
+
+	vkCmdBeginConditionalRendering = (PFN_vkCmdBeginConditionalRenderingEXT)vkGetInstanceProcAddr(Scope->GetInstance(), "vkCmdBeginConditionalRenderingEXT");
+	vkCmdEndConditionalRendering = (PFN_vkCmdEndConditionalRenderingEXT)vkGetInstanceProcAddr(Scope->GetInstance(), "vkCmdEndConditionalRenderingEXT");
 }
 
 GVkCommandBuffer::~GVkCommandBuffer()
@@ -26,23 +33,28 @@ GVkCommandBuffer::~GVkCommandBuffer()
 			_submitRecording(object);
 
 		object.fence->Wait();
+
 		Scope->GetQueue(m_qFlags).freeCommandBuffer(object.cmd);
 	}
 }
 
-GVkCommandBuffer::_internalObj& GVkCommandBuffer::_updateRecording()
+GVkCommandBuffer::_internalObj& GVkCommandBuffer::_updateRecording(const VkCommandBufferInheritanceInfo* inheritance)
 {
 	auto& object = _activeObj();
 
 	if (!object.bRecording)
 	{
+		object.acquired_resources.clear();
+		object.pipeline = VK_NULL_HANDLE;
+		object.bRecorded  = false;
+		object.bRecording = true;
+
 		object.fence->Wait();
 
 		VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+		beginInfo.flags = inheritance ? VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT : VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+		beginInfo.pInheritanceInfo = inheritance;
 		vkBeginCommandBuffer(object.cmd, &beginInfo);
-		
-		object.acquired_resources.clear();
-		object.bRecording = true;
 	}
 
 	return object;
@@ -57,11 +69,15 @@ void GVkCommandBuffer::_submitRecording(_internalObj& object)
 
 		vkEndCommandBuffer(object.cmd);
 
-		object.fence->Reset();
-		Scope->GetQueue(m_qFlags).submitCommandBuffer(object.cmd, object.fence->GetFence());
+		if (!CheckFlag(m_cmdFlags, ECmdFlags::Secondary))
+		{
+			object.fence->Reset();
+			Scope->GetQueue(m_qFlags).submitCommandBuffer(object.cmd, object.fence->GetFence());
+		}
 
 		object.pipeline = VK_NULL_HANDLE;
 		object.bRecording = false;
+		object.bRecorded = true;
 	}
 }
 
@@ -76,10 +92,26 @@ void GVkCommandBuffer::_nextSubpass()
 	}
 }
 
+void GVkCommandBuffer::_acquire(std::shared_ptr<IVkObj> obj)
+{
+	auto& object = _activeObj();
+	object.acquired_resources.emplace_back(std::move(obj));
+}
+
 VkCommandBuffer GVkCommandBuffer::GetCommandBuffer()
 {
 	auto& object = _activeObj();
 	return object.cmd;
+}
+
+bool GVkCommandBuffer::IsRecorded()
+{
+	if (CheckFlag(m_cmdFlags, ECmdFlags::Secondary))
+	{
+		auto& object = _activeObj();
+		return object.bRecorded;
+	}
+	return false;
 }
 
 void GVkCommandBuffer::Wait()
@@ -124,8 +156,8 @@ void GVkCommandBuffer::CopyBuffer(std::shared_ptr<GVkBufferView> BufferSrc, std:
 	BindBarrier<GVkTransferSrcBarrier>(BufferSrc);
 	vkCmdCopyBuffer(object.cmd, BufferSrc->GetBuffer(), BufferDst->GetBuffer(), 1, &region);
 
-	object.acquired_resources.emplace_back(BufferSrc);
-	object.acquired_resources.emplace_back(BufferDst);
+	_acquire(BufferSrc);
+	_acquire(BufferDst);
 }
 
 void GVkCommandBuffer::CopyBuffer(std::shared_ptr<GVkBufferView> BufferSrc, std::shared_ptr<GVkImageView> ImageDst)
@@ -146,8 +178,8 @@ void GVkCommandBuffer::CopyBuffer(std::shared_ptr<GVkBufferView> BufferSrc, std:
 	BindBarrier<GVkTransferDstBarrier>(ImageDst);
 	vkCmdCopyBufferToImage(object.cmd, BufferSrc->GetBuffer(), ImageDst->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, copies.size(), copies.data());
 
-	object.acquired_resources.emplace_back(BufferSrc);
-	object.acquired_resources.emplace_back(ImageDst);
+	_acquire(BufferSrc);
+	_acquire(ImageDst);
 }
 
 void GVkCommandBuffer::GenerateMipMaps(std::shared_ptr<GVkImage> Image)
@@ -170,6 +202,16 @@ void GVkCommandBuffer::GenerateMipMaps(std::shared_ptr<GVkImage> Image)
 	BindBarrier<GVkShaderReadBarrier>(view, VK_SHADER_STAGE_FRAGMENT_BIT);
 }
 
+void GVkCommandBuffer::ClearBuffer(std::shared_ptr<GVkBufferView> View, uint32_t Value)
+{
+	auto& object = _updateRecording();
+
+	BindBarrier<GVkTransferDstBarrier>(View);
+	vkCmdFillBuffer(object.cmd, View->GetBuffer(), View->GetOffset(), View->GetSize(), Value);
+
+	_acquire(View);
+}
+
 void GVkCommandBuffer::ClearImage(std::shared_ptr<GVkImageView> Image, VkClearColorValue ClearValue)
 {
 	auto& object = _updateRecording();
@@ -177,7 +219,7 @@ void GVkCommandBuffer::ClearImage(std::shared_ptr<GVkImageView> Image, VkClearCo
 	BindBarrier<GVkTransferDstBarrier>(Image);
 	vkCmdClearColorImage(object.cmd, Image->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &ClearValue, 1, &Image->GetSubresource());
 
-	object.acquired_resources.emplace_back(Image);
+	_acquire(Image);
 }
 
 void GVkCommandBuffer::ClearImage(std::shared_ptr<GVkImageView> View, VkClearDepthStencilValue ClearValue)
@@ -187,7 +229,7 @@ void GVkCommandBuffer::ClearImage(std::shared_ptr<GVkImageView> View, VkClearDep
 	BindBarrier<GVkTransferDstBarrier>(View);
 	vkCmdClearDepthStencilImage(object.cmd, View->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &ClearValue, 1, &View->GetSubresource());
 
-	object.acquired_resources.emplace_back(View);
+	_acquire(View);
 }
 
 void GVkCommandBuffer::BlitImage(std::shared_ptr<GVkImageView> Image, std::shared_ptr<GVkSwapchain> Swapchain)
@@ -217,8 +259,8 @@ void GVkCommandBuffer::BlitImage(std::shared_ptr<GVkImageView> Image, std::share
 	vkCmdBlitImage(object.cmd, Image->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Swapchain->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageBlit, VK_FILTER_LINEAR);
 	BindBarrier<GVkPresentBarrier>(Swapchain);
 
-	object.acquired_resources.emplace_back(Swapchain);
-	object.acquired_resources.emplace_back(Image);
+	_acquire(Swapchain);
+	_acquire(Image);
 }
 
 void GVkCommandBuffer::BlitImage(std::shared_ptr<GVkImageView> Source, std::shared_ptr<GVkImageView> Destination)
@@ -250,43 +292,69 @@ void GVkCommandBuffer::BlitImage(std::shared_ptr<GVkImageView> Source, std::shar
 	bool IsDepth = Source->GetRoot()->IsDepth();
 	vkCmdBlitImage(object.cmd, Source->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Destination->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageBlit, IsDepth ? VK_FILTER_NEAREST : VK_FILTER_LINEAR);
 
-	object.acquired_resources.emplace_back(Destination);
-	object.acquired_resources.emplace_back(Source);
+	_acquire(Destination);
+	_acquire(Source);
 }
 
-void GVkCommandBuffer::BeginRenderPass(std::shared_ptr<GVkRenderPass> RenderPass, std::shared_ptr<GVkFramebuffer> Framebuffer)
+void GVkCommandBuffer::BeginRenderPass(std::shared_ptr<GVkRenderPass> RenderPass, std::shared_ptr<GVkFramebuffer> Framebuffer, VkSubpassContents Contents)
 {
 	if (RenderPass && Framebuffer)
 	{
-		auto& object = _updateRecording();
+		bool secondary = CheckFlag(m_cmdFlags, ECmdFlags::Secondary);
+
+		VkCommandBufferInheritanceInfo inheritanceInfo{};
+		inheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
+		inheritanceInfo.framebuffer = Framebuffer->GetFramebuffer();
+		inheritanceInfo.renderPass = RenderPass->GetRenderPass();
+		inheritanceInfo.subpass = 0;
+
+		auto& object = _updateRecording(secondary ? &inheritanceInfo : VK_NULL_HANDLE);
 		object.activeSubpass = 0;
 		object.renderPass = RenderPass;
 		object.framebuffer = Framebuffer;
-		object.acquired_resources.emplace_back(RenderPass);
-		object.acquired_resources.emplace_back(Framebuffer);
 
-		uint32_t index = 0;
-		auto& views = object.framebuffer->GetViews();
-		for (auto& view : views)
+		if (!secondary)
 		{
-			auto attState = object.renderPass->_getAttachmentState(index);
-			BindBarrier<GVkBarrier>(view, attState.initial_layout, attState.initial_stage, attState.initial_access);
-			index++;
+			uint32_t index = 0;
+			auto& views = object.framebuffer->GetViews();
+			for (auto& view : views)
+			{
+				auto attState = object.renderPass->_getAttachmentState(index);
+				BindBarrier<GVkBarrier>(view, attState.initial_layout, attState.initial_stage, attState.initial_access);
+				index++;
+			}
+
+			VkRenderPassBeginInfo beginInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
+			beginInfo.clearValueCount = RenderPass->GetClearValues().size();
+			beginInfo.pClearValues = RenderPass->GetClearValues().data();
+			beginInfo.framebuffer = Framebuffer->GetFramebuffer();
+			beginInfo.renderArea = Framebuffer->GetRenderArea();
+			beginInfo.renderPass = RenderPass->GetRenderPass();
+			vkCmdBeginRenderPass(object.cmd, &beginInfo, Contents);
 		}
 
-		VkRenderPassBeginInfo beginInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-		beginInfo.clearValueCount = RenderPass->GetClearValues().size();
-		beginInfo.pClearValues = RenderPass->GetClearValues().data();
-		beginInfo.framebuffer = Framebuffer->GetFramebuffer();
-		beginInfo.renderArea = Framebuffer->GetRenderArea();
-		beginInfo.renderPass = RenderPass->GetRenderPass();
-		vkCmdBeginRenderPass(object.cmd, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
+		if (secondary || Contents != VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS)
+		{
+			VkRect2D Scissor = Framebuffer->GetRenderArea();
+			vkCmdSetScissor(object.cmd, 0, 1, &Scissor);
 
-		VkRect2D Scissor = Framebuffer->GetRenderArea();
-		vkCmdSetScissor(object.cmd, 0, 1, &Scissor);
+			VkViewport Viewport = { 0, 0, Scissor.extent.width, Scissor.extent.height, 0.0, 1.0 };
+			vkCmdSetViewport(object.cmd, 0, 1, &Viewport);
+		}
 
-		VkViewport Viewport = { 0, 0, Scissor.extent.width, Scissor.extent.height, 0.0, 1.0 };
+		_acquire(RenderPass);
+		_acquire(Framebuffer);
+	}
+}
+
+void GVkCommandBuffer::SetRenderArea(const VkRect2D& Scissor, const VkViewport& Viewport)
+{
+	auto& object = _activeObj();
+	
+	if (object.renderPass)
+	{
 		vkCmdSetViewport(object.cmd, 0, 1, &Viewport);
+		vkCmdSetScissor(object.cmd, 0, 1, &Scissor);
 	}
 }
 
@@ -296,20 +364,23 @@ void GVkCommandBuffer::EndRenderPass()
 
 	if (object.renderPass != VK_NULL_HANDLE)
 	{
-		while (object.activeSubpass < (object.renderPass->GetSubpassCount() - 1))
-			_nextSubpass();
-
-		vkCmdEndRenderPass(object.cmd);
-
-		uint32_t index = 0;
-		auto& views = object.framebuffer->GetViews();
-
-		for (auto& view : views)
+		if (!CheckFlag(m_cmdFlags, ECmdFlags::Secondary))
 		{
-			auto attState = object.renderPass->_getAttachmentState(index);
-			view->_setImageState(attState.final_layout, attState.final_stage, attState.final_access);
-			BindBarrier<GVkBarrier>(view, attState.next_layout, attState.next_stage, attState.next_access);
-			index++;
+			while (object.activeSubpass < (object.renderPass->GetSubpassCount() - 1))
+				_nextSubpass();
+
+			vkCmdEndRenderPass(object.cmd);
+
+			uint32_t index = 0;
+			auto& views = object.framebuffer->GetViews();
+
+			for (auto& view : views)
+			{
+				auto attState = object.renderPass->_getAttachmentState(index);
+				view->_setImageState(attState.final_layout, attState.final_stage, attState.final_access);
+				BindBarrier<GVkBarrier>(view, attState.next_layout, attState.next_stage, attState.next_access);
+				index++;
+			}
 		}
 
 		object.framebuffer = VK_NULL_HANDLE;
@@ -321,10 +392,10 @@ void GVkCommandBuffer::EndRenderPass()
 
 void GVkCommandBuffer::BindPipeline(std::shared_ptr<GVkPipeline> Pipeline)
 {
-	if (Pipeline)
-	{
-		auto& object = _updateRecording();
+	auto& object = _updateRecording();
 
+	if (Pipeline && object.pipeline != Pipeline)
+	{
 		object.pipeline = Pipeline;
 
 		if (object.renderPass)
@@ -333,10 +404,10 @@ void GVkCommandBuffer::BindPipeline(std::shared_ptr<GVkPipeline> Pipeline)
 
 			while (object.activeSubpass < object.pipeline->GetSubpass())
 				_nextSubpass();
-
-			vkCmdBindPipeline(object.cmd, Pipeline->GetBindPoint(), Pipeline->GetPipeline());
-			object.acquired_resources.emplace_back(Pipeline);
 		}
+
+		vkCmdBindPipeline(object.cmd, Pipeline->GetBindPoint(), Pipeline->GetPipeline());
+		_acquire(Pipeline);
 	}
 }
 
@@ -348,8 +419,14 @@ void GVkCommandBuffer::BindDescriptorSet(uint32_t Slot, std::shared_ptr<GVkDescr
 		assert(object.pipeline);
 
 		vkCmdBindDescriptorSets(object.cmd, object.pipeline->GetBindPoint(), object.pipeline->GetLayout(), Slot, 1, &Set->GetDescriptorSet(), 0, VK_NULL_HANDLE);
-		object.acquired_resources.emplace_back(Set);
+		_acquire(Set);
 	}
+}
+
+void GVkCommandBuffer::Dispatch(uint32_t X, uint32_t Y, uint32_t Z)
+{
+	auto& object = _updateRecording();
+	vkCmdDispatch(object.cmd, X, Y, Z);
 }
 
 void GVkCommandBuffer::Draw(uint32_t VertexCount, uint32_t InstanceCount, uint32_t BaseVertex, uint32_t BaseInstance)
@@ -367,7 +444,7 @@ void GVkCommandBuffer::BindVertexBuffer(uint32_t Slot, std::shared_ptr<GVkBuffer
 	VkBuffer vbo = Buffer->GetBuffer();
 	VkDeviceSize offset = Buffer->GetOffset();
 	vkCmdBindVertexBuffers(object.cmd, Slot, 1, &vbo, &offset);
-	object.acquired_resources.emplace_back(Buffer);
+	_acquire(Buffer);
 }
 
 void GVkCommandBuffer::BindIndexBuffer(VkIndexType Type, std::shared_ptr<GVkBufferView> Buffer)
@@ -377,7 +454,7 @@ void GVkCommandBuffer::BindIndexBuffer(VkIndexType Type, std::shared_ptr<GVkBuff
 	VkBuffer ibo = Buffer->GetBuffer();
 	VkDeviceSize offset = Buffer->GetOffset();
 	vkCmdBindIndexBuffer(object.cmd, ibo, offset, Type);
-	object.acquired_resources.emplace_back(Buffer);
+	_acquire(Buffer);
 }
 
 void GVkCommandBuffer::DrawIndexed(uint32_t Count, uint32_t InstanceCount, uint32_t BaseVertex, uint32_t FirstIndex, uint32_t BaseInstance)
@@ -386,4 +463,70 @@ void GVkCommandBuffer::DrawIndexed(uint32_t Count, uint32_t InstanceCount, uint3
 
 	assert(object.renderPass && object.pipeline);
 	vkCmdDrawIndexed(object.cmd, Count, InstanceCount, FirstIndex, BaseVertex, BaseInstance);
+}
+
+void GVkCommandBuffer::DrawIndirectCount(std::shared_ptr<GVkBuffer> IndirectBuffer, std::shared_ptr<GVkBuffer> CountBuffer, size_t CountOffset, uint32_t MaxCounts, uint32_t Stride)
+{
+	auto& object = _updateRecording();
+
+	vkCmdDrawIndirectCount(object.cmd, IndirectBuffer->GetBuffer(), 0, CountBuffer->GetBuffer(), CountOffset, MaxCounts, Stride);
+	_acquire(IndirectBuffer);
+	_acquire(CountBuffer);
+}
+
+void GVkCommandBuffer::DrawIndirectIndexedCount(std::shared_ptr<GVkBuffer> IndirectBuffer, std::shared_ptr<GVkBuffer> CountBuffer, size_t CountOffset, uint32_t MaxCounts, uint32_t Stride)
+{
+	auto& object = _updateRecording();
+
+	vkCmdDrawIndexedIndirectCount(object.cmd, IndirectBuffer->GetBuffer(), 0, CountBuffer->GetBuffer(), CountOffset, MaxCounts, Stride);
+	_acquire(IndirectBuffer);
+	_acquire(CountBuffer);
+}
+
+void GVkCommandBuffer::DrawIndirect(std::shared_ptr<GVkBufferView> IndirectBuffer)
+{
+	auto& object = _updateRecording();
+
+	vkCmdDrawIndirect(object.cmd, IndirectBuffer->GetBuffer(), IndirectBuffer->GetOffset(), IndirectBuffer->GetSize() / sizeof(VkDrawIndirectCommand), sizeof(VkDrawIndirectCommand));
+	_acquire(IndirectBuffer);
+}
+
+void GVkCommandBuffer::DrawIndirectIndexed(std::shared_ptr<GVkBufferView> IndirectBuffer)
+{
+	auto& object = _updateRecording();
+
+	vkCmdDrawIndexedIndirect(object.cmd, IndirectBuffer->GetBuffer(), IndirectBuffer->GetOffset(), IndirectBuffer->GetSize() / sizeof(VkDrawIndexedIndirectCommand), sizeof(VkDrawIndexedIndirectCommand));
+	_acquire(IndirectBuffer);
+}
+
+void GVkCommandBuffer::BeginConditionalRendering(std::shared_ptr<GVkBufferView> Buffer)
+{
+	if (vkCmdBeginConditionalRendering)
+	{
+		auto& object = _updateRecording();
+
+		VkConditionalRenderingBeginInfoEXT beginInfo{};
+		beginInfo.sType = VK_STRUCTURE_TYPE_CONDITIONAL_RENDERING_BEGIN_INFO_EXT;
+		beginInfo.buffer = Buffer->GetBuffer();
+		beginInfo.offset = Buffer->GetOffset();
+		beginInfo.flags = 0;
+
+		vkCmdBeginConditionalRendering(object.cmd, &beginInfo);
+		_acquire(Buffer);
+	}
+}
+
+void GVkCommandBuffer::EndConditionalRendering()
+{
+	if (vkCmdEndConditionalRendering)
+	{
+		auto& object = _updateRecording();
+		vkCmdEndConditionalRendering(object.cmd);
+	}
+}
+
+void GVkCommandBuffer::Execute(const std::vector<VkCommandBuffer>& Commands)
+{
+	auto& object = _updateRecording();
+	vkCmdExecuteCommands(object.cmd, Commands.size(), Commands.data());
 }

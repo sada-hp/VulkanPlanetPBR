@@ -8,8 +8,6 @@ class GCloudsStage : public IRenderStage
 {
 	struct
 	{
-		std::shared_ptr<GVkImage> ColorHR = VK_NULL_HANDLE;
-		std::shared_ptr<GVkImage> DepthHR = VK_NULL_HANDLE;
 		std::shared_ptr<GVkImage> DepthLR = VK_NULL_HANDLE;
 		std::shared_ptr<GVkImage> CloudsLR = VK_NULL_HANDLE;
 		std::shared_ptr<GVkImage> PerlinWorley = VK_NULL_HANDLE;
@@ -30,7 +28,7 @@ protected:
 	std::shared_ptr<GVkImage> _generate_noise(const std::string& shader, VkFormat Format, VkExtent3D extents, uint32_t freq, uint32_t octaves);
 
 public:
-	GCloudsStage(std::shared_ptr<RenderScope> Scope, const GVkSharedResources& Resources);
+	GCloudsStage(std::shared_ptr<RenderScope> Scope);
 	virtual ~GCloudsStage();
 	void Execute(const GCamera& Camera, const IWorld& World) override;
 };

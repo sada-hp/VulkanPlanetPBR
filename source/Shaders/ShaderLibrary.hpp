@@ -58,4 +58,6 @@ public:
 	static ShaderCodeType MeshCompositePS;
 	// Post process
 	static ShaderCodeType TonemapPS;
+	// Culling
+	static ShaderCodeType CullCS;
 };

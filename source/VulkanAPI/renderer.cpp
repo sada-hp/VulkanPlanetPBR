@@ -7,6 +7,7 @@
 
 #include "RenderStages/Precompute/atmosphereLUT.hpp"
 #include "RenderStages/mesh_objects.hpp"
+#include "RenderStages/gpu_culling.hpp"
 #include "RenderStages/tonemapping.hpp"
 #include "RenderStages/atmosphere.hpp"
 #include "RenderStages/clear_pass.hpp"
@@ -19,17 +20,18 @@ GVulkanBase::GVulkanBase(GLFWwindow* window)
 	m_BlitCommandBuffer = std::make_shared<GVkCommandBuffer>(m_Scope, VK_QUEUE_GRAPHICS_BIT, ECmdFlags::InFlight);
 	m_DrawCommandBuffer = std::make_shared<GVkCommandBuffer>(m_Scope, VK_QUEUE_GRAPHICS_BIT, ECmdFlags::InFlight);
 
-	m_Resources.FinalTarget = GVkImageFactory::FinalRenderTargetFlight(m_Scope, m_Swapchain->GetExtent());
-	m_Resources.ColorBuffer = GVkImageFactory::ColorRenderTargetFlight(m_Scope, m_Swapchain->GetExtent());
-	m_Resources.DepthBuffer = GVkImageFactory::DepthRenderTargetFlight(m_Scope, m_Swapchain->GetExtent());
-	m_Resources.UBO = GVkBufferFactory::Buffer(m_Scope, EBufferFlags::InFlight | EBufferFlags::Mapped | EBufferFlags::Uniform, sizeof(_UniformBuffer));
+	GVkSharedResources::Instance.FinalTarget = GVkImageFactory::FinalRenderTargetFlight(m_Scope, m_Swapchain->GetExtent());
+	GVkSharedResources::Instance.ColorBuffer = GVkImageFactory::ColorRenderTargetFlight(m_Scope, m_Swapchain->GetExtent());
+	GVkSharedResources::Instance.DepthBuffer = GVkImageFactory::DepthRenderTargetFlight(m_Scope, m_Swapchain->GetExtent());
+	GVkSharedResources::Instance.UBO = GVkBufferFactory::Buffer(m_Scope, EBufferFlags::InFlight | EBufferFlags::Mapped | EBufferFlags::Uniform, sizeof(_UniformBuffer));
 
 	// precompute
-	GAtmospherePrecomputeLUT::Execute(m_Scope, m_Resources);
+	GAtmospherePrecomputeLUT::Execute(m_Scope);
 
 	// render stages
 	AddRenderStage<GAttachmentsClear>();
 	AddRenderStage<GCloudsStage>();
+	AddRenderStage<GCullingStage>();
 	AddRenderStage<GMeshStage>();
 	AddRenderStage<GAtmosphereStage>();
 	AddRenderStage<GTonemapStage>();
@@ -65,13 +67,13 @@ bool GVulkanBase::Draw(const GCamera& Camera, const IWorld& World)
 		UBO.eye_pos = glm::vec4(pos, 1.0);
 		UBO.time = glfwGetTime();
 
-		memcpy(m_Resources.UBO->Map(), &UBO, sizeof(UBO));
-		m_Resources.UBO->UnMap();
+		memcpy(GVkSharedResources::Instance.UBO->Map(), &UBO, sizeof(UBO));
+		GVkSharedResources::Instance.UBO->UnMap();
 
 		for (auto& Stage : m_RenderStages)
 			Stage->Execute(Camera, World);
 
-		m_BlitCommandBuffer->BlitImage(GVkImage::ToView(m_Resources.FinalTarget), m_Swapchain);
+		m_BlitCommandBuffer->BlitImage(GVkImage::ToView(GVkSharedResources::Instance.FinalTarget), m_Swapchain);
 		m_BlitCommandBuffer->Submit();
 		m_Swapchain->Present();
 

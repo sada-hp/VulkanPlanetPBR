@@ -2,12 +2,12 @@
 #include "Factories/VkImageFactory.hpp"
 #include "Factories/VkSamplerFactory.hpp"
 
-GMeshStage::GMeshStage(std::shared_ptr<RenderScope> Scope, const GVkSharedResources& Resources)
+GMeshStage::GMeshStage(std::shared_ptr<RenderScope> Scope)
 	: IRenderStage(Scope, VK_QUEUE_GRAPHICS_BIT)
 {
-	Images.DeferredColor = GVkImageFactory::Image(Scope, VK_FORMAT_R16G16B16A16_SFLOAT, Resources.ColorBuffer->GetExtent(), EImageFlags::RenderTarget | EImageFlags::SubpassInput | EImageFlags::InFlight);
-	Images.DeferredNormal = GVkImageFactory::Image(Scope, VK_FORMAT_R16G16B16A16_SFLOAT, Resources.ColorBuffer->GetExtent(), EImageFlags::RenderTarget | EImageFlags::SubpassInput | EImageFlags::InFlight);
-	Images.DeferredPosition = GVkImageFactory::Image(Scope, VK_FORMAT_R32G32B32A32_SFLOAT, Resources.ColorBuffer->GetExtent(), EImageFlags::RenderTarget | EImageFlags::SubpassInput | EImageFlags::InFlight);
+	Images.DeferredColor = GVkImageFactory::Image(Scope, VK_FORMAT_R16G16B16A16_SFLOAT, GVkSharedResources::Instance.ColorBuffer->GetExtent(), EImageFlags::RenderTarget | EImageFlags::SubpassInput | EImageFlags::InFlight);
+	Images.DeferredNormal = GVkImageFactory::Image(Scope, VK_FORMAT_R16G16B16A16_SFLOAT, GVkSharedResources::Instance.ColorBuffer->GetExtent(), EImageFlags::RenderTarget | EImageFlags::SubpassInput | EImageFlags::InFlight);
+	Images.DeferredPosition = GVkImageFactory::Image(Scope, VK_FORMAT_R32G32B32A32_SFLOAT, GVkSharedResources::Instance.ColorBuffer->GetExtent(), EImageFlags::RenderTarget | EImageFlags::SubpassInput | EImageFlags::InFlight);
 
 	RenderPass = GetRenderPass(Scope);
 	Framebuffer = std::make_shared<GVkFramebuffer>(Scope, RenderPass, std::vector
@@ -15,12 +15,12 @@ GMeshStage::GMeshStage(std::shared_ptr<RenderScope> Scope, const GVkSharedResour
 		GVkImage::ToView(Images.DeferredColor),
 		GVkImage::ToView(Images.DeferredNormal),
 		GVkImage::ToView(Images.DeferredPosition),
-		GVkImage::ToView(Resources.ColorBuffer), 
-		GVkImage::ToView(Resources.DepthBuffer) 
+		GVkImage::ToView(GVkSharedResources::Instance.ColorBuffer),
+		GVkImage::ToView(GVkSharedResources::Instance.DepthBuffer)
 	});
 
-	_initDrawPass(Resources);
-	_initCompositePass(Resources);
+	_initDrawPass();
+	_initCompositePass();
 }
 
 GMeshStage::~GMeshStage()
@@ -28,20 +28,20 @@ GMeshStage::~GMeshStage()
 
 }
 
-void GMeshStage::_initDrawPass(const GVkSharedResources& Resources)
+void GMeshStage::_initDrawPass()
 {
 	DescriptorSetDescriptor DSDesc{};
-	DSDesc.AddUniformBuffer(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, GVkBuffer::ToView(Resources.UBO));
+	DSDesc.AddUniformBuffer(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, GVkBuffer::ToView(GVkSharedResources::Instance.UBO));
 	Descriptors.Draw = DSDesc.Allocate(Scope);
 }
 
-void GMeshStage::_initCompositePass(const GVkSharedResources& Resources)
+void GMeshStage::_initCompositePass()
 {
 	DescriptorSetDescriptor DSDesc{};
-	DSDesc.AddUniformBuffer(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, GVkBuffer::ToView(Resources.UBO));
-	DSDesc.AddImageSampler(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Resources.IrradianceLUT), GVkSamplerFactory::LinearSamplerRepeat(Scope));
-	DSDesc.AddImageSampler(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Resources.ScatteringLUT), GVkSamplerFactory::LinearSamplerRepeat(Scope));
-	DSDesc.AddImageSampler(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Resources.TransmittanceLUT), GVkSamplerFactory::LinearSamplerRepeat(Scope));
+	DSDesc.AddUniformBuffer(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, GVkBuffer::ToView(GVkSharedResources::Instance.UBO));
+	DSDesc.AddImageSampler(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(GVkSharedResources::Instance.IrradianceLUT), GVkSamplerFactory::LinearSamplerRepeat(Scope));
+	DSDesc.AddImageSampler(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(GVkSharedResources::Instance.ScatteringLUT), GVkSamplerFactory::LinearSamplerRepeat(Scope));
+	DSDesc.AddImageSampler(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(GVkSharedResources::Instance.TransmittanceLUT), GVkSamplerFactory::LinearSamplerRepeat(Scope));
 	DSDesc.AddSubpassAttachment(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Images.DeferredColor));
 	DSDesc.AddSubpassAttachment(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Images.DeferredNormal));
 	DSDesc.AddSubpassAttachment(VK_SHADER_STAGE_FRAGMENT_BIT, GVkImage::ToView(Images.DeferredPosition));
@@ -65,48 +65,37 @@ void GMeshStage::_initCompositePass(const GVkSharedResources& Resources)
 	Pipelines.Composite = PSODesc.Construct(Scope);
 }
 
+void GVkCommandBuffer::NextSubpass()
+{
+	auto& object = _activeObj();
+
+	assert(object.renderPass);
+	_nextSubpass();
+}
+
 void GMeshStage::Execute(const GCamera& Camera, const IWorld& World)
 {
-	CommandBuffer->BeginRenderPass(RenderPass, Framebuffer);
+	auto view = World.GetRegistry().view<EllipsoidMatrix, GDrawable>();
 
-	std::vector<std::pair<const GDrawable*, const EllipsoidMatrix*>> objects;
-	World.GetDrawableObjects(objects);
+	VkRect2D Scissor = Framebuffer->GetRenderArea();
+	VkViewport Viewport = { 0, 0, Scissor.extent.width, Scissor.extent.height, 0.0, 1.0 };
 
-	glm::dvec3 CameraOffset = Camera.GetWorldMatrix().GetPosition();
-	for (auto& [object, matrix] : objects)
+	CommandBuffer->BeginRenderPass(RenderPass, Framebuffer, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+
+	std::vector<VkCommandBuffer> _commands;
+	_commands.reserve(view.size_hint());
+
+	for (const auto& [ent, matrix, object] : view.each())
 	{
-		/*
-		* Preprocess world matrix on CPU to avoid FP64 math on GPU
-		*/
-		glm::dmat4 WorldMatrix = matrix->GetMatrix();
-		WorldMatrix[3].x -= CameraOffset.x;
-		WorldMatrix[3].y -= CameraOffset.y;
-		WorldMatrix[3].z -= CameraOffset.z;
-
-		glm::mat4 CompressedMatrix = WorldMatrix;
-		bool IsIndexed = object->Mesh->IndexCount() > 0;
-
-		CommandBuffer->BindVertexBuffer(0, GVkBuffer::ToView(object->Mesh->VertexBuffer()));
-
-		if (IsIndexed)
-			CommandBuffer->BindIndexBuffer(object->Mesh->IndexType(), GVkBuffer::ToView(object->Mesh->IndexBuffer()));
-
-		for (auto& material : object->Materials)
-		{
-			CommandBuffer->BindPipeline(material->GetPipeline());
-			CommandBuffer->BindDescriptorSet(0, Descriptors.Draw);
-
-			if (auto descriptorset = material->GetDescriptorSet())
-				CommandBuffer->BindDescriptorSet(1, descriptorset);
-
-			CommandBuffer->PushConstants(0, CompressedMatrix);
-
-			if (IsIndexed)
-				CommandBuffer->DrawIndexed(object->Mesh->IndexCount());
-			else
-				CommandBuffer->Draw(object->Mesh->VertexCount());
-		}
+		VkCommandBuffer subCommand = object._getPrerecordedCommands(RenderPass, Framebuffer, matrix.GetBufferGPU(), Descriptors.Draw);
+		_commands.emplace_back(subCommand);
 	}
+
+	CommandBuffer->Execute(_commands);
+
+	CommandBuffer->NextSubpass();
+
+	CommandBuffer->SetRenderArea(Scissor, Viewport);
 
 	CommandBuffer->BindPipeline(Pipelines.Composite);
 	CommandBuffer->BindDescriptorSet(0, Descriptors.Composite);

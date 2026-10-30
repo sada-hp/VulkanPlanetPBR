@@ -5,6 +5,23 @@
 #include "image.hpp"
 #include "scope.hpp"
 
+class GVkDescriptorSetLayout : public IVkObj
+{
+	friend class DescriptorLayoutDescriptor;
+
+private:
+	VkDescriptorSetLayout m_descriptorSetLayout = VK_NULL_HANDLE;
+	std::shared_ptr<RenderScope> Scope = VK_NULL_HANDLE;
+
+private:
+	GVkDescriptorSetLayout(std::shared_ptr<RenderScope> Scope, const VkDescriptorSetLayoutCreateInfo& info);
+
+public:
+	virtual ~GVkDescriptorSetLayout();
+
+	const VkDescriptorSetLayout& GetLayout() const { return m_descriptorSetLayout; }
+};
+
 class GVkDescriptorSet : public IVkObj
 {
 	friend class DescriptorSetDescriptor;
@@ -38,6 +55,29 @@ public:
 	const VkDescriptorSet& GetDescriptorSet() const;
 };
 
+class DescriptorLayoutDescriptor
+{
+	friend class DescriptorSetDescriptor;
+
+	const VkDescriptorBindingFlags variableFlags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
+
+	std::vector<VkDescriptorSetLayoutBinding> bindings = {};
+	std::vector<VkDescriptorBindingFlags> flags = {};
+	bool bVariable = false;
+
+public:
+	DescriptorLayoutDescriptor& AddUniformBuffer(VkShaderStageFlags stages, bool bVariableSize = false);
+	DescriptorLayoutDescriptor& AddStorageBuffer(VkShaderStageFlags stages, bool bVariableSize = false);
+
+	DescriptorLayoutDescriptor& AddImageSampler(VkShaderStageFlags stages, bool bVariableSize = false);
+	DescriptorLayoutDescriptor& AddStorageImage(VkShaderStageFlags stages, bool bVariableSize = false);
+
+	DescriptorLayoutDescriptor& AddSubpassAttachment(VkShaderStageFlags stages);
+	uint32_t GetBindingCount() const { return bindings.size(); }
+
+	std::shared_ptr<GVkDescriptorSetLayout> Construct(std::shared_ptr<RenderScope> Scope);
+};
+
 class DescriptorSetDescriptor
 {
 	struct _buffer_write
@@ -55,16 +95,21 @@ class DescriptorSetDescriptor
 	};
 
 private:
-	std::vector<VkDescriptorSetLayoutBinding> descriptorBindings = {};
 	std::vector<std::shared_ptr<IVkObj>> acquiredObjects = {};
 	std::vector<_buffer_write> bufferWrites = {};
 	std::vector<_image_write> imageWrites = {};
+	std::vector<uint32_t> arraySizes = {};
+
+	DescriptorLayoutDescriptor layoutDescriptor;
 
 	std::shared_ptr<RenderScope> Scope = VK_NULL_HANDLE;
 	bool bIsInFlight = false;
 
 public:
+	DescriptorSetDescriptor& AddUniformBuffer(VkShaderStageFlags stages, std::vector<std::shared_ptr<GVkBufferView>> views);
 	DescriptorSetDescriptor& AddUniformBuffer(VkShaderStageFlags stages, std::shared_ptr<GVkBufferView> view);
+	
+	DescriptorSetDescriptor& AddStorageBuffer(VkShaderStageFlags stages, std::vector<std::shared_ptr<GVkBufferView>> views);
 	DescriptorSetDescriptor& AddStorageBuffer(VkShaderStageFlags stages, std::shared_ptr<GVkBufferView> view);
 
 	DescriptorSetDescriptor& AddImageSampler(VkShaderStageFlags stages, const std::vector<std::pair<std::shared_ptr<GVkImageView>, std::shared_ptr<GVkSampler>>>& image_samplers);
@@ -74,37 +119,4 @@ public:
 	DescriptorSetDescriptor& AddSubpassAttachment(VkShaderStageFlags stages, std::shared_ptr<GVkImageView> view);
 
 	std::shared_ptr<GVkDescriptorSet> Allocate(std::shared_ptr<RenderScope> Scope);
-};
-
-class GVkDescriptorSetLayout : public IVkObj
-{
-	friend class DescriptorLayoutDescriptor;
-
-private:
-	VkDescriptorSetLayout m_descriptorSetLayout = VK_NULL_HANDLE;
-	std::shared_ptr<RenderScope> Scope = VK_NULL_HANDLE;
-
-private:
-	GVkDescriptorSetLayout(std::shared_ptr<RenderScope> Scope, const VkDescriptorSetLayoutCreateInfo& info);
-
-public:
-	virtual ~GVkDescriptorSetLayout();
-
-	const VkDescriptorSetLayout& GetLayout() const { return m_descriptorSetLayout; }
-};
-
-class DescriptorLayoutDescriptor
-{
-	std::vector<VkDescriptorSetLayoutBinding> bindings = {};
-
-public:
-	DescriptorLayoutDescriptor& AddUniformBuffer(VkShaderStageFlags stages);
-	DescriptorLayoutDescriptor& AddStorageBuffer(VkShaderStageFlags stages);
-
-	DescriptorLayoutDescriptor& AddImageSampler(VkShaderStageFlags stages);
-	DescriptorLayoutDescriptor& AddStorageImage(VkShaderStageFlags stages);
-
-	DescriptorLayoutDescriptor& AddSubpassAttachment(VkShaderStageFlags stages);
-
-	std::shared_ptr<GVkDescriptorSetLayout> Construct(std::shared_ptr<RenderScope> Scope);
 };

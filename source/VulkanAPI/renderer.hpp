@@ -24,7 +24,6 @@ private:
 	std::shared_ptr<GVkCommandBuffer> m_DrawCommandBuffer = VK_NULL_HANDLE;
 
 protected:
-	GVkSharedResources m_Resources;
 	std::vector<IRenderStage*> m_RenderStages = {};
 
 protected:
@@ -38,6 +37,6 @@ public:
 	template<typename T, typename ...Args>
 	inline void AddRenderStage(Args&& ...args)
 	{
-		m_RenderStages.push_back(new T(m_Scope, m_Resources, args...));
+		m_RenderStages.push_back(new T(m_Scope, args...));
 	}
 };

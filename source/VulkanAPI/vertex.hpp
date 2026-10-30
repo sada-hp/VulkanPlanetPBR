@@ -25,17 +25,22 @@ public:
 public:
 	static const std::vector<VkVertexInputBindingDescription> getBindingDescriptions()
 	{
-		VkVertexInputBindingDescription bindingDescription{};
-		bindingDescription.binding = 0;
-		bindingDescription.stride = sizeof(MeshVertex);
-		bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		VkVertexInputBindingDescription bindingDescription_v{};
+		bindingDescription_v.binding = 0;
+		bindingDescription_v.stride = sizeof(MeshVertex);
+		bindingDescription_v.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-		return std::vector{ bindingDescription };
+		VkVertexInputBindingDescription bindingDescription_t{};
+		bindingDescription_t.binding = 1;
+		bindingDescription_t.stride = sizeof(glm::mat4);
+		bindingDescription_t.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
+
+		return std::vector{ bindingDescription_v, bindingDescription_t };
 	}
 
 	static const std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions()
 	{
-		std::vector<VkVertexInputAttributeDescription> attributeDescriptions(5);
+		std::vector<VkVertexInputAttributeDescription> attributeDescriptions(9);
 
 		attributeDescriptions[0].binding = 0;
 		attributeDescriptions[0].location = 0;
@@ -61,6 +66,26 @@ public:
 		attributeDescriptions[4].location = 4;
 		attributeDescriptions[4].format = VK_FORMAT_R32G32_SFLOAT;
 		attributeDescriptions[4].offset = offsetof(MeshVertex, uv);
+
+		attributeDescriptions[5].binding = 1;
+		attributeDescriptions[5].location = 5;
+		attributeDescriptions[5].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+		attributeDescriptions[5].offset = 0;
+
+		attributeDescriptions[6].binding = 1;
+		attributeDescriptions[6].location = 6;
+		attributeDescriptions[6].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+		attributeDescriptions[6].offset = sizeof(glm::vec4);
+
+		attributeDescriptions[7].binding = 1;
+		attributeDescriptions[7].location = 7;
+		attributeDescriptions[7].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+		attributeDescriptions[7].offset = 2 * sizeof(glm::vec4);
+
+		attributeDescriptions[8].binding = 1;
+		attributeDescriptions[8].location = 8;
+		attributeDescriptions[8].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+		attributeDescriptions[8].offset = 3 * sizeof(glm::vec4);
 
 		return attributeDescriptions;
 	}
