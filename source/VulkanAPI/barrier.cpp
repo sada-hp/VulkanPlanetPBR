@@ -1,10 +1,31 @@
 #include "barrier.hpp"
 
-void GVkBarrier::Bind(VkCommandBuffer cmd)
+void GVkBarrier::GetBufferBarreirs(std::vector<VkBufferMemoryBarrier2>& bufferBarriers) const
 {
-	std::vector<VkBufferMemoryBarrier2> bufferBarriers;
-	std::vector<VkImageMemoryBarrier2> imageBarriers;
+	if (Buffer != VK_NULL_HANDLE)
+	{
+		VkBufferMemoryBarrier2 bufferBarrier{ VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2 };
 
+		bufferBarrier.dstQueueFamilyIndex = dstQueue;
+		bufferBarrier.srcQueueFamilyIndex = srcQueue;
+
+		bufferBarrier.dstAccessMask = barrierAccess;
+		bufferBarrier.dstStageMask = barrierStage;
+
+		bufferBarrier.buffer = Buffer->GetBuffer();
+		bufferBarrier.offset = Buffer->GetOffset();
+		bufferBarrier.size = Buffer->GetSize();
+
+		// ? TODO
+		bufferBarrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT;
+		bufferBarrier.srcStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+
+		bufferBarriers.push_back(bufferBarrier);
+	}
+}
+
+void GVkBarrier::GetImageBarreirs(std::vector<VkImageMemoryBarrier2>& imageBarriers) const
+{
 	if (Image != VK_NULL_HANDLE)
 	{
 		VkImageMemoryBarrier2 imageBarrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2 };
@@ -55,22 +76,22 @@ void GVkBarrier::Bind(VkCommandBuffer cmd)
 			}
 
 			std::erase_if(levelBarriers, [&](VkImageMemoryBarrier2& levelBarrier) mutable
-			{
-				for (auto& layerBarrier : layerBarriers)
 				{
-					if (levelBarrier.oldLayout == layerBarrier.oldLayout
-						&& levelBarrier.srcAccessMask == layerBarrier.srcAccessMask
-						&& levelBarrier.srcStageMask == layerBarrier.srcStageMask
-						&& levelBarrier.subresourceRange.levelCount == layerBarrier.subresourceRange.levelCount
-						&& levelBarrier.subresourceRange.baseMipLevel == layerBarrier.subresourceRange.baseMipLevel)
+					for (auto& layerBarrier : layerBarriers)
 					{
-						layerBarrier.subresourceRange.layerCount++;
-						return true;
+						if (levelBarrier.oldLayout == layerBarrier.oldLayout
+							&& levelBarrier.srcAccessMask == layerBarrier.srcAccessMask
+							&& levelBarrier.srcStageMask == layerBarrier.srcStageMask
+							&& levelBarrier.subresourceRange.levelCount == layerBarrier.subresourceRange.levelCount
+							&& levelBarrier.subresourceRange.baseMipLevel == layerBarrier.subresourceRange.baseMipLevel)
+						{
+							layerBarrier.subresourceRange.layerCount++;
+							return true;
+						}
 					}
-				}
 
-				return false;
-			});
+					return false;
+				});
 
 			if (!levelBarriers.empty())
 				layerBarriers.insert(layerBarriers.end(), levelBarriers.begin(), levelBarriers.end());
@@ -117,27 +138,15 @@ void GVkBarrier::Bind(VkCommandBuffer cmd)
 		Swapchain->SetImageState(layout, barrierStage, barrierAccess);
 		imageBarriers.push_back(swapchainBarrier);
 	}
+}
 
-	if (Buffer != VK_NULL_HANDLE)
-	{
-		VkBufferMemoryBarrier2 bufferBarrier{ VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2 };
+void GVkBarrier::Bind(VkCommandBuffer cmd)
+{
+	std::vector<VkImageMemoryBarrier2> imageBarriers{};
+	GetImageBarreirs(imageBarriers);
 
-		bufferBarrier.dstQueueFamilyIndex = dstQueue;
-		bufferBarrier.srcQueueFamilyIndex = srcQueue;
-
-		bufferBarrier.dstAccessMask = barrierAccess;
-		bufferBarrier.dstStageMask = barrierStage;
-
-		bufferBarrier.buffer = Buffer->GetBuffer();
-		bufferBarrier.offset = Buffer->GetOffset();
-		bufferBarrier.size = Buffer->GetSize();
-
-		// ? TODO
-		bufferBarrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT;
-		bufferBarrier.srcStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-
-		bufferBarriers.push_back(bufferBarrier);
-	}
+	std::vector<VkBufferMemoryBarrier2> bufferBarriers{};
+	GetBufferBarreirs(bufferBarriers);
 
 	VkDependencyInfo dependencyInfo{ VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
 	dependencyInfo.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;

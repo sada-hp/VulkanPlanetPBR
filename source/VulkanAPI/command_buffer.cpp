@@ -530,3 +530,18 @@ void GVkCommandBuffer::Execute(const std::vector<VkCommandBuffer>& Commands)
 	auto& object = _updateRecording();
 	vkCmdExecuteCommands(object.cmd, Commands.size(), Commands.data());
 }
+
+void GVkCommandBuffer::BindBarriers(const std::vector<VkBufferMemoryBarrier2>& buffers, const std::vector<VkImageMemoryBarrier2>& images)
+{
+	VkDependencyInfo dependencyInfo{ VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
+	dependencyInfo.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+	dependencyInfo.bufferMemoryBarrierCount = buffers.size();
+	dependencyInfo.pBufferMemoryBarriers = buffers.data();
+
+	dependencyInfo.imageMemoryBarrierCount = images.size();
+	dependencyInfo.pImageMemoryBarriers = images.data();
+
+	auto& object = _updateRecording();
+	vkCmdPipelineBarrier2(object.cmd, &dependencyInfo);
+}

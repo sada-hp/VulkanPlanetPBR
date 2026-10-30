@@ -123,6 +123,8 @@ public:
 		_acquire(target);
 	}
 
+	void BindBarriers(const std::vector<VkBufferMemoryBarrier2>& buffers, const std::vector<VkImageMemoryBarrier2>& images);
+
 	template<typename T>
 	inline void PushConstants(uint32_t index, const T& data)
 	{

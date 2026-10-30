@@ -52,6 +52,9 @@ public:
 	{
 	}
 
+	void GetBufferBarreirs(std::vector<VkBufferMemoryBarrier2>& bufferBarriers) const;
+	void GetImageBarreirs(std::vector<VkImageMemoryBarrier2>& imageBarriers) const;
+
 	void Bind(VkCommandBuffer cmd);
 };
 

@@ -209,11 +209,14 @@ std::shared_ptr<GVkDescriptorSet> DescriptorSetDescriptor::Allocate(std::shared_
 
 	std::unordered_map<VkDescriptorType, uint32_t> descriptor_counts = {};
 	for (auto& binding : layoutDescriptor.bindings)
+	{
+		binding.descriptorCount = _clampToCapability(Scope, binding.descriptorType, binding.descriptorCount);
 		descriptor_counts[binding.descriptorType] += binding.descriptorCount;
+	}
 
 	std::vector<VkDescriptorPoolSize> pool_sizes = {};
 	for (auto& [type, count] : descriptor_counts)
-		pool_sizes.emplace_back(type, FlightCount * _clampToCapability(Scope, type, count));
+		pool_sizes.emplace_back(type, FlightCount * count);
 
 	VkDescriptorPoolCreateInfo poolCreateInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
 	poolCreateInfo.maxSets = FlightCount;
