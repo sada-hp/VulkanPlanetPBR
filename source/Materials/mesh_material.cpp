@@ -16,39 +16,50 @@ GMeshMaterial::GMeshMaterial(std::shared_ptr<RenderScope> Scope, const MaterialD
 	GraphicsPipelineDescriptor PSODesc{};
 	PSODesc.AddDescriptorLayout(Layout->GetLayout());
 	PSODesc.SetRenderPass(RenderPass);
-	PSODesc.SetVertexAttributeBindings(MeshVertex::getAttributeDescriptions())
-		.SetVertexInputBindings(MeshVertex::getBindingDescriptions())
-		.SetCullMode(Descriptor.CullMode, Descriptor.FrontFace)
+	PSODesc.SetCullMode(Descriptor.CullMode, Descriptor.FrontFace)
 		.SetPrimitiveTopology(Descriptor.PrimitiveTopology)
 		.SetPolygonMode(Descriptor.PolygonMode);
 
+	std::vector<std::pair<std::shared_ptr<GVkImageView>, std::shared_ptr<GVkSampler>>> albedoResources;
+	for (const auto& pack : Descriptor.SubmeshTextures)
+	{
+		std::shared_ptr<GVkSampler> albedoSampler = GVkSamplerFactory::LinearSamplerRepeat(Scope, pack.Albedo->GetMipLevelsCount());
+		albedoResources.emplace_back(GVkImage::ToView(pack.Albedo), albedoSampler);
+	}
+
 	PSODesc.VS.AppendCode(GShaderUtils::UBOCommon)
-		.AppendCode(GShaderUtils::LightingCommon)
-		.AppendCode(GShaders::MeshVS);
+		.AppendCode(GShaderUtils::LightingCommon);
 
 	PSODesc.PS.AppendCode(GShaderUtils::UBOCommon)
 		.AppendCode(GShaderUtils::LightingCommon);
 
-	if (Descriptor.SubmeshTextures.empty())
+	if (!albedoResources.empty())
 	{
-		PSODesc.PS.AppendCode(GShaders::MeshDefaultPS);
-	}
-	else
-	{
-		PSODesc.PS.AppendCode(GShaders::MeshPS);
-
-		std::vector<std::pair<std::shared_ptr<GVkImageView>, std::shared_ptr<GVkSampler>>> albedoResources;
-		for (const auto& pack : Descriptor.SubmeshTextures)
-		{
-			std::shared_ptr<GVkSampler> albedoSampler = GVkSamplerFactory::LinearSamplerRepeat(Scope, pack.Albedo->GetMipLevelsCount());
-			albedoResources.emplace_back(GVkImage::ToView(pack.Albedo), albedoSampler);
-		}
-
 		DescriptorSetDescriptor DSDesc{};
 		DSDesc.AddImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, albedoResources);
 		DescriptorSet = DSDesc.Allocate(Scope);
 
 		PSODesc.AddDescriptorLayout(DescriptorSet->GetLayout());
+		PSODesc.PS.AppendCode(GShaders::MeshPS);
+	}
+	else
+	{
+		PSODesc.PS.AppendCode(GShaders::MeshDefaultPS);
+	}
+
+	if (Descriptor.Compressed)
+	{
+		PSODesc.VS.AppendCode(GShaders::CompressedMeshVS);
+
+		PSODesc.SetVertexAttributeBindings(CompressedVertex::getAttributeDescriptions())
+			.SetVertexInputBindings(CompressedVertex::getBindingDescriptions());
+	}
+	else
+	{
+		PSODesc.VS.AppendCode(GShaders::MeshVS);
+
+		PSODesc.SetVertexAttributeBindings(MeshVertex::getAttributeDescriptions())
+			.SetVertexInputBindings(MeshVertex::getBindingDescriptions());
 	}
 
 	Pipeline = PSODesc.Construct(Scope);

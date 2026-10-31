@@ -54,6 +54,7 @@ public:
 	// Mesh
 	static ShaderCodeType MeshVS;
 	static ShaderCodeType MeshPS;
+	static ShaderCodeType CompressedMeshVS;
 	static ShaderCodeType MeshDefaultPS;
 	static ShaderCodeType MeshCompositePS;
 	// Post process

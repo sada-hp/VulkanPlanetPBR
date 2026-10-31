@@ -15,6 +15,7 @@ public:
 	VkFrontFace FrontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	VkPrimitiveTopology PrimitiveTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	VkPolygonMode PolygonMode = VK_POLYGON_MODE_FILL;
+	bool Compressed = false;
 
 public:
 	std::vector<TexturePack> SubmeshTextures;

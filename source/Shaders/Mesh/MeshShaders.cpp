@@ -22,7 +22,58 @@ ShaderCodeDefinition(GShaders::MeshVS)
 
 		mat3 NormalMatrix = mat3(Matrix);
 		fragNormal = normalize(NormalMatrix * vertNormal);
-		fragPosition = WorldPosition.xyz + UBO.eye_pos.xyz;
+		// fragPosition = WorldPosition.xyz + UBO.eye_pos.xyz;
+		fragPosition = WorldPosition.xyz;
+		fragSubmesh = vertSubmesh;
+		fragUV = vertUV;
+	}
+);
+
+ShaderCodeDefinition(GShaders::CompressedMeshVS)
+(
+	layout(location = 0) in uvec4 packedData;
+	layout(location = 1) in mat4 Matrix;
+
+	layout(location = 0) out vec2 fragUV;
+	layout(location = 1) out flat uint fragSubmesh;
+	layout(location = 2) out vec3 fragNormal;
+	layout(location = 3) out vec3 fragPosition;
+
+	vec3 unpackNormal(vec2 e) 
+	{
+		vec3 n = vec3(e.xy, 1.0 - abs(e.x) - abs(e.y));
+		if (n.z < 0.0) 
+		{
+			n.xy = (1.0 - abs(n.yx)) * sign(n.xy);
+		}
+		return normalize(n);
+	}
+
+	void unpackInput(out vec3 p, out vec3 n, out vec2 uv, out uint submesh)
+	{
+		vec2 d0 = unpackHalf2x16(packedData.x);
+		vec2 d1 = unpackHalf2x16(packedData.y);
+		vec2 d2 = unpackHalf2x16(packedData.z);
+		vec2 d3 = unpackHalf2x16(packedData.w);
+
+		p = vec3(d0.x, d0.y, d1.x);
+		n = unpackNormal(vec2(d1.y, d2.x));
+		uv = vec2(d2.y, d3.x);
+		submesh = uint(d3.y);
+	}
+
+	void main()
+	{
+		vec3 vertPosition; vec3 vertNormal; vec2 vertUV; uint vertSubmesh;
+		unpackInput(vertPosition, vertNormal, vertUV, vertSubmesh);
+
+		vec4 WorldPosition = Matrix * vec4(vertPosition, 1.0);
+		gl_Position = vec4(UBO.view_proj * WorldPosition);
+
+		mat3 NormalMatrix = mat3(Matrix);
+		fragNormal = normalize(NormalMatrix * vertNormal);
+		// fragPosition = WorldPosition.xyz + UBO.eye_pos.xyz;
+		fragPosition = WorldPosition.xyz;
 		fragSubmesh = vertSubmesh;
 		fragUV = vertUV;
 	}

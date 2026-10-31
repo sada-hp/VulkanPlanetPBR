@@ -90,8 +90,9 @@ class GVkMesh : public IMesh
 
 		for (auto& vertex : vertices)
 		{
-			m_BoxMin = glm::min(m_BoxMin, vertex.position);
-			m_BoxMax = glm::max(m_BoxMax, vertex.position);
+			glm::vec3 position = vertex.position;
+			m_BoxMin = glm::min(m_BoxMin, position);
+			m_BoxMax = glm::max(m_BoxMax, position);
 		}
 	}
 
