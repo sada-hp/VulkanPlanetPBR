@@ -5,14 +5,14 @@
 
 namespace GVkMeshFactory
 {
-	inline std::shared_ptr<IMesh> Mesh(std::shared_ptr<RenderScope> Scope, const std::vector<MeshVertex>& vertices, const std::vector<uint32_t>& indices)
+	inline std::shared_ptr<IMesh> Mesh(std::shared_ptr<RenderScope> Scope, const std::vector<MeshVertex>& vertices, const std::vector<uint32_t>& indices, const glm::vec3& aabb_min = glm::vec3(-INFINITY), const glm::vec3& aabb_max = glm::vec3(INFINITY))
 	{
-		return std::shared_ptr<IMesh>(new GVkMesh<MeshVertex>(Scope, vertices, indices));
+		return std::shared_ptr<IMesh>(new GVkMesh<MeshVertex>(Scope, vertices, indices, aabb_min, aabb_max));
 	}
 
-	inline std::shared_ptr<IMesh> Mesh(std::shared_ptr<RenderScope> Scope, const std::vector<MeshVertex>& vertices)
+	inline std::shared_ptr<IMesh> Mesh(std::shared_ptr<RenderScope> Scope, const std::vector<MeshVertex>& vertices, const glm::vec3& aabb_min = glm::vec3(-INFINITY), const glm::vec3& aabb_max = glm::vec3(INFINITY))
 	{
-		return std::shared_ptr<IMesh>(new GVkMesh<MeshVertex>(Scope, vertices));
+		return std::shared_ptr<IMesh>(new GVkMesh<MeshVertex>(Scope, vertices, aabb_min, aabb_max));
 	}
 
 	inline std::vector<uint32_t> GenerateQuadIndices(uint32_t slices, uint32_t stacks, uint32_t base_index = 0)
@@ -86,7 +86,10 @@ namespace GVkMeshFactory
 		std::vector<uint32_t> indices = GenerateQuadIndices(slices, stacks);
 		CalculateNormals(vertices, indices);
 
-		return Mesh(Scope, vertices, indices);
+		glm::vec3 min = glm::vec3(-width / 2.0, 0.0, -height / 2.0);
+		glm::vec3 max = glm::vec3(width / 2.0, 0.0, height / 2.0);
+
+		return Mesh(Scope, vertices, indices, min, max);
 	}
 
 	inline std::shared_ptr<IMesh> Cube(std::shared_ptr<RenderScope> Scope, float width, float height, float depth, uint32_t slices = 1u, uint32_t stacks = 1u, bool separate_sumbeshes_by_face = false)
@@ -98,6 +101,7 @@ namespace GVkMeshFactory
 
 		float pos_dx = width * uv_dx;
 		float pos_dy = height * uv_dy;
+
 
 		int face = 0;
 		auto generateFace = [&](float p, float y, float r)
@@ -138,8 +142,11 @@ namespace GVkMeshFactory
 		// other side
 		generateFace(0.0, 0.0, -90.0);
 
+		glm::vec3 min = glm::vec3(-width / 2.0, -depth / 2.0, -height / 2.0);
+		glm::vec3 max = glm::vec3(width / 2.0, depth / 2.0, height / 2.0);
+
 		CalculateNormals(vertices, indices);
-		return Mesh(Scope, vertices, indices);
+		return Mesh(Scope, vertices, indices, min, max);
 	}
 
 	inline std::shared_ptr<IMesh> QuadrilateralSphere(std::shared_ptr<RenderScope> Scope, float Radius, uint32_t subdivisions = 16u)
@@ -179,7 +186,10 @@ namespace GVkMeshFactory
 		// other side
 		generateFace(0.0, 0.0, -90.0);
 
+		glm::vec3 min = glm::vec3(-Radius);
+		glm::vec3 max = glm::vec3(Radius);
+
 		CalculateNormals(vertices, indices);
-		return Mesh(Scope, vertices, indices);
+		return Mesh(Scope, vertices, indices, min, max);
 	}
 };

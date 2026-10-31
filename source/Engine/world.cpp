@@ -1,5 +1,12 @@
 #include "world.hpp"
 
+struct SMeshData
+{
+	glm::mat4 transform;
+	glm::vec4 min;
+	glm::vec4 max;
+};
+
 IWorld::IWorld(std::shared_ptr<RenderScope> InScope)
 	: Scope(InScope)
 {
@@ -8,7 +15,7 @@ IWorld::IWorld(std::shared_ptr<RenderScope> InScope)
 	registry.on_update<GDrawable>().connect<&IWorld::update_gpu_actor>(this);
 
 	_indirectPool = GVkBufferFactory::Buffer(Scope, EBufferFlags::Storage | EBufferFlags::Conditional | EBufferFlags::Indirect | EBufferFlags::InFlight, sizeof(VkDrawIndirectCommand) * 16192);
-	_transformsPool = GVkBufferFactory::Buffer(Scope, EBufferFlags::Storage | EBufferFlags::Host | EBufferFlags::Vertex, sizeof(glm::mat4) * 16192);
+	_transformsPool = GVkBufferFactory::Buffer(Scope, EBufferFlags::Storage | EBufferFlags::Host | EBufferFlags::Vertex, sizeof(SMeshData) * 16192);
 }
 
 IWorld::~IWorld()
@@ -35,7 +42,7 @@ void IWorld::update_descriptors()
 	auto view = registry.view<EllipsoidMatrix, GDrawable>();
 	size_t objects_count = view.size_hint();
 
-	size_t t_size = sizeof(glm::mat4) * objects_count;
+	size_t t_size = sizeof(SMeshData) * objects_count;
 	if (t_size > _transformsPool->GetSize())
 	{
 		_transformsPool = GVkBufferFactory::Buffer(Scope, EBufferFlags::Storage | EBufferFlags::Host | EBufferFlags::Vertex, t_size);
@@ -50,16 +57,16 @@ void IWorld::update_descriptors()
 	std::vector<VkDrawIndexedIndirectCommand> drawCommands{};
 	drawCommands.reserve(objects_count);
 
-	std::vector<glm::mat4> sceneTransforms{};
+	std::vector<SMeshData> sceneTransforms{};
 	sceneTransforms.reserve(objects_count);
 
 	uint32_t arrIdx = 0;
 	for (const auto& [ent, matrix, draw] : view.each())
 	{
 		drawCommands.emplace_back(std::move(draw.Mesh->GetDrawCommand()));
-		sceneTransforms.emplace_back(matrix.GetMatrix());
+		sceneTransforms.emplace_back(matrix.GetMatrix(), glm::vec4(draw.Mesh->GetMinPoint(), 1.0), glm::vec4(draw.Mesh->GetMaxPoint(), 1.0));
 
-		matrix.AssignBuffer(GVkBuffer::ToView(_transformsPool, arrIdx * sizeof(glm::mat4), sizeof(glm::mat4)));
+		matrix.AssignBuffer(GVkBuffer::ToView(_transformsPool, arrIdx * sizeof(SMeshData), sizeof(SMeshData)));
 		draw._indirectCallView = GVkBuffer::ToView(_indirectPool, arrIdx * sizeof(VkDrawIndexedIndirectCommand), sizeof(VkDrawIndexedIndirectCommand));
 		draw._conditionalView = GVkBuffer::ToView(_indirectPool, arrIdx * sizeof(VkDrawIndexedIndirectCommand) + offsetof(VkDrawIndexedIndirectCommand, instanceCount), sizeof(uint32_t));
 

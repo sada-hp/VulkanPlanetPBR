@@ -32,15 +32,18 @@ void GCullingStage::Execute(const GCamera& Camera, const IWorld& World)
 
 	uint32_t Invocations = (Count / 32) + uint32_t(Count % 32 > 0);
 
-	_shaderData Data;
+	_shaderData Data{};
 
-	glm::mat4 ViewProjMatrix = Camera.ProjectionViewMat4();
-	for (int i = 4; i--; ) { Data.planes[0][i] = ViewProjMatrix[i][3] + ViewProjMatrix[i][0]; }
-	for (int i = 4; i--; ) { Data.planes[1][i] = ViewProjMatrix[i][3] - ViewProjMatrix[i][0]; }
-	for (int i = 4; i--; ) { Data.planes[2][i] = ViewProjMatrix[i][3] + ViewProjMatrix[i][1]; }
-	for (int i = 4; i--; ) { Data.planes[3][i] = ViewProjMatrix[i][3] - ViewProjMatrix[i][1]; }
-	for (int i = 4; i--; ) { Data.planes[4][i] = ViewProjMatrix[i][3] + ViewProjMatrix[i][2]; }
-	for (int i = 4; i--; ) { Data.planes[5][i] = ViewProjMatrix[i][3] - ViewProjMatrix[i][2]; }
+	glm::dmat4 m = glm::transpose(Camera.ProjectionViewMat4());
+	Data.planes[0] = m[3] + m[0];
+	Data.planes[1] = m[3] - m[0];
+	Data.planes[2] = m[3] + m[1];
+	Data.planes[3] = m[3] - m[1];
+	Data.planes[4] = m[2];
+	Data.planes[5] = m[3] - m[2];
+
+	for (int i = 0; i < 6; i++)
+		Data.planes[i] /= glm::length(glm::vec3(Data.planes[i]));
 
 	Data.invocations = Count;
 
