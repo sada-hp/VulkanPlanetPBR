@@ -65,6 +65,8 @@ bool GVulkanBase::Draw(const GCamera& Camera, const IWorld& World)
 		UBO.reproj = reproj;
 		UBO.sun_dir = glm::vec4(World.GetSunDirection(), 0.0);
 		UBO.eye_pos = glm::vec4(pos, 1.0);
+		UBO.eye_pos_i = glm::ivec4(pos, 0.0);
+		UBO.eye_pos_f = glm::vec4(pos - glm::dvec3(UBO.eye_pos_i), 0.0);
 		UBO.time = glfwGetTime();
 
 		memcpy(GVkSharedResources::Instance.UBO->Map(), &UBO, sizeof(UBO));

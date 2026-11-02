@@ -28,9 +28,11 @@ GMeshMaterial::GMeshMaterial(std::shared_ptr<RenderScope> Scope, const MaterialD
 	}
 
 	PSODesc.VS.AppendCode(GShaderUtils::UBOCommon)
+		.AppendCode(GShaderUtils::UtilsCommon)
 		.AppendCode(GShaderUtils::LightingCommon);
 
 	PSODesc.PS.AppendCode(GShaderUtils::UBOCommon)
+		.AppendCode(GShaderUtils::UtilsCommon)
 		.AppendCode(GShaderUtils::LightingCommon);
 
 	if (!albedoResources.empty())

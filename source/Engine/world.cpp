@@ -2,9 +2,9 @@
 
 struct SMeshData
 {
-	glm::mat4 transform;
-	glm::vec4 min;
-	glm::vec4 max;
+	DecomposedMatrix transform;
+	glm::vec3 min;
+	glm::vec3 max;
 };
 
 IWorld::IWorld(std::shared_ptr<RenderScope> InScope)
@@ -64,7 +64,7 @@ void IWorld::update_descriptors()
 	for (const auto& [ent, matrix, draw] : view.each())
 	{
 		drawCommands.emplace_back(std::move(draw.Mesh->GetDrawCommand()));
-		sceneTransforms.emplace_back(matrix.GetMatrix(), glm::vec4(draw.Mesh->GetMinPoint(), 1.0), glm::vec4(draw.Mesh->GetMaxPoint(), 1.0));
+		sceneTransforms.emplace_back(matrix.GetDecompose(), glm::vec4(draw.Mesh->GetMinPoint(), 1.0), glm::vec4(draw.Mesh->GetMaxPoint(), 1.0));
 
 		matrix.AssignBuffer(GVkBuffer::ToView(_transformsPool, arrIdx * sizeof(SMeshData), sizeof(SMeshData)));
 		draw._indirectCallView = GVkBuffer::ToView(_indirectPool, arrIdx * sizeof(VkDrawIndexedIndirectCommand), sizeof(VkDrawIndexedIndirectCommand));

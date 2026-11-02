@@ -65,6 +65,7 @@ bool RenderScope::_createLogicalDevice(VkPhysicalDevice physicalDevice, const st
 		availableFeaturesVk12.descriptorBindingVariableDescriptorCount  != VK_TRUE ||
 		availableFeaturesVk12.descriptorBindingPartiallyBound           != VK_TRUE ||
 		availableFeaturesVk12.shaderSampledImageArrayNonUniformIndexing != VK_TRUE ||
+		availableFeaturesVk12.scalarBlockLayout                         != VK_TRUE ||
 		availableconditionalRenderinFeatures.conditionalRendering       != VK_TRUE ||
 		availableSynchronization2Features.synchronization2              != VK_TRUE)
 	{
@@ -84,6 +85,7 @@ bool RenderScope::_createLogicalDevice(VkPhysicalDevice physicalDevice, const st
 	featureVk12.descriptorBindingPartiallyBound = VK_TRUE;
 	featureVk12.runtimeDescriptorArray = VK_TRUE;
 	featureVk12.drawIndirectCount = VK_TRUE;
+	featureVk12.scalarBlockLayout = VK_TRUE;
 
 	VkPhysicalDeviceFeatures deviceFeatures{};
 	deviceFeatures.imageCubeArray = VK_TRUE;

@@ -7,7 +7,10 @@ ShaderCodeDefinition(GShaders::MeshVS)
 	layout(location = 2) in vec3 vertNormal;
 	layout(location = 3) in vec3 vertTangent;
 	layout(location = 4) in vec2 vertUV;
-	layout(location = 5) in mat4 Matrix;
+
+	layout(location = 5) in mat3 vertRotation;
+	layout(location = 8) in ivec4 vertOffsetI;
+	layout(location = 9) in vec4  vertOffsetF;
 
 	layout(location = 0) out vec2 fragUV;
 	layout(location = 1) out flat uint fragSubmesh;
@@ -16,14 +19,15 @@ ShaderCodeDefinition(GShaders::MeshVS)
 
 	void main()
 	{
+		mat4 Matrix = mat4(vertRotation);
+		Matrix[3].xyz = vec3(vertOffsetI.xyz - UBO.eye_pos_i.xyz) + vec3(vertOffsetF.xyz - UBO.eye_pos_f.xyz);
+
 		vec4 WorldPosition = Matrix * vec4(vertPosition, 1.0);
-		// gl_Position = vec4(UBO.view_proj_no_offset * WorldPosition);
-		gl_Position = vec4(UBO.view_proj * WorldPosition);
+		gl_Position = vec4(UBO.view_proj_no_offset * WorldPosition);
 
 		mat3 NormalMatrix = mat3(Matrix);
 		fragNormal = normalize(NormalMatrix * vertNormal);
-		// fragPosition = WorldPosition.xyz + UBO.eye_pos.xyz;
-		fragPosition = WorldPosition.xyz;
+		fragPosition = WorldPosition.xyz + UBO.eye_pos.xyz;
 		fragSubmesh = vertSubmesh;
 		fragUV = vertUV;
 	}
@@ -32,7 +36,10 @@ ShaderCodeDefinition(GShaders::MeshVS)
 ShaderCodeDefinition(GShaders::CompressedMeshVS)
 (
 	layout(location = 0) in uvec4 packedData;
-	layout(location = 1) in mat4 Matrix;
+
+	layout(location = 1) in mat3 vertRotation;
+	layout(location = 4) in ivec4 vertOffsetI;
+	layout(location = 5) in  vec4 vertOffsetF;
 
 	layout(location = 0) out vec2 fragUV;
 	layout(location = 1) out flat uint fragSubmesh;
@@ -64,16 +71,18 @@ ShaderCodeDefinition(GShaders::CompressedMeshVS)
 
 	void main()
 	{
+		mat4 Matrix = mat4(vertRotation);
+		Matrix[3].xyz = vec3(vertOffsetI.xyz - UBO.eye_pos_i.xyz) + vec3(vertOffsetF.xyz - UBO.eye_pos_f.xyz);
+
 		vec3 vertPosition; vec3 vertNormal; vec2 vertUV; uint vertSubmesh;
 		unpackInput(vertPosition, vertNormal, vertUV, vertSubmesh);
 
 		vec4 WorldPosition = Matrix * vec4(vertPosition, 1.0);
-		gl_Position = vec4(UBO.view_proj * WorldPosition);
+		gl_Position = vec4(UBO.view_proj_no_offset * WorldPosition);
 
 		mat3 NormalMatrix = mat3(Matrix);
 		fragNormal = normalize(NormalMatrix * vertNormal);
-		// fragPosition = WorldPosition.xyz + UBO.eye_pos.xyz;
-		fragPosition = WorldPosition.xyz;
+		fragPosition = WorldPosition.xyz + UBO.eye_pos.xyz;
 		fragSubmesh = vertSubmesh;
 		fragUV = vertUV;
 	}

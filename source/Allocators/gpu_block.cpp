@@ -7,7 +7,7 @@ GGPuMemoryPool::GGPuMemoryPool(std::shared_ptr<RenderScope> InScope, EBufferFlag
 	, m_Flags(flags)
 {
 	_views.resize(count);
-	m_Buffer = GVkBufferFactory::Buffer(Scope, flags, 2 * stride * (count + 1));
+	m_Buffer = GVkBufferFactory::Buffer(Scope, flags, stride * (count + 1));
 	_commandBuffer = std::make_shared<GVkCommandBuffer>(Scope, VK_QUEUE_TRANSFER_BIT);
 }
 

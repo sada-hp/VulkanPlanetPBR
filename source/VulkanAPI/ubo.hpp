@@ -10,6 +10,8 @@ mat4 view_proj_inv; \
 mat4 reproj; \
 vec4 sun_dir; \
 vec4 eye_pos; \
+ivec4 eye_pos_i; \
+vec4 eye_pos_f; \
 float time; \
 
 struct _UniformBuffer

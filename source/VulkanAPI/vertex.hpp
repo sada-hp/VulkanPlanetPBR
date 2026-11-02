@@ -1,4 +1,5 @@
 #pragma once
+#include "Math/DecomposedMatrix.hpp"
 #include <vulkan/vulkan.h>
 #include "glm/gtx/hash.hpp"
 #include "Utils/float8.hpp"
@@ -42,7 +43,7 @@ public:
 
 	static const std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions()
 	{
-		std::vector<VkVertexInputAttributeDescription> attributeDescriptions(9);
+		std::vector<VkVertexInputAttributeDescription> attributeDescriptions(10);
 
 		attributeDescriptions[0].binding = 0;
 		attributeDescriptions[0].location = 0;
@@ -71,23 +72,28 @@ public:
 
 		attributeDescriptions[5].binding = 1;
 		attributeDescriptions[5].location = 5;
-		attributeDescriptions[5].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+		attributeDescriptions[5].format = VK_FORMAT_R32G32B32_SFLOAT;
 		attributeDescriptions[5].offset = 0;
 
 		attributeDescriptions[6].binding = 1;
 		attributeDescriptions[6].location = 6;
-		attributeDescriptions[6].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-		attributeDescriptions[6].offset = sizeof(glm::vec4);
+		attributeDescriptions[6].format = VK_FORMAT_R32G32B32_SFLOAT;
+		attributeDescriptions[6].offset = sizeof(glm::vec3);
 
 		attributeDescriptions[7].binding = 1;
 		attributeDescriptions[7].location = 7;
-		attributeDescriptions[7].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-		attributeDescriptions[7].offset = 2 * sizeof(glm::vec4);
+		attributeDescriptions[7].format = VK_FORMAT_R32G32B32_SFLOAT;
+		attributeDescriptions[7].offset = 2 * sizeof(glm::vec3);
 
 		attributeDescriptions[8].binding = 1;
 		attributeDescriptions[8].location = 8;
-		attributeDescriptions[8].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-		attributeDescriptions[8].offset = 3 * sizeof(glm::vec4);
+		attributeDescriptions[8].format = VK_FORMAT_R32G32B32_SINT;
+		attributeDescriptions[8].offset = offsetof(DecomposedMatrix, offset_i);
+
+		attributeDescriptions[9].binding = 1;
+		attributeDescriptions[9].location = 9;
+		attributeDescriptions[9].format = VK_FORMAT_R32G32B32_SFLOAT;
+		attributeDescriptions[9].offset = offsetof(DecomposedMatrix, offset_f);
 
 		return attributeDescriptions;
 	}
@@ -135,7 +141,7 @@ public:
 
 	static const std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions()
 	{
-		std::vector<VkVertexInputAttributeDescription> attributeDescriptions(5);
+		std::vector<VkVertexInputAttributeDescription> attributeDescriptions(6);
 
 		attributeDescriptions[0].binding = 0;
 		attributeDescriptions[0].location = 0;
@@ -144,23 +150,28 @@ public:
 
 		attributeDescriptions[1].binding = 1;
 		attributeDescriptions[1].location = 1;
-		attributeDescriptions[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+		attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
 		attributeDescriptions[1].offset = 0;
 
 		attributeDescriptions[2].binding = 1;
 		attributeDescriptions[2].location = 2;
-		attributeDescriptions[2].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-		attributeDescriptions[2].offset = sizeof(glm::vec4);
+		attributeDescriptions[2].format = VK_FORMAT_R32G32B32_SFLOAT;
+		attributeDescriptions[2].offset = sizeof(glm::vec3);
 
 		attributeDescriptions[3].binding = 1;
 		attributeDescriptions[3].location = 3;
-		attributeDescriptions[3].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-		attributeDescriptions[3].offset = 2 * sizeof(glm::vec4);
+		attributeDescriptions[3].format = VK_FORMAT_R32G32B32_SFLOAT;
+		attributeDescriptions[3].offset = 2 * sizeof(glm::vec3);
 
 		attributeDescriptions[4].binding = 1;
 		attributeDescriptions[4].location = 4;
-		attributeDescriptions[4].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-		attributeDescriptions[4].offset = 3 * sizeof(glm::vec4);
+		attributeDescriptions[4].format = VK_FORMAT_R32G32B32_SINT;
+		attributeDescriptions[4].offset = offsetof(DecomposedMatrix, offset_i);
+
+		attributeDescriptions[5].binding = 1;
+		attributeDescriptions[5].location = 5;
+		attributeDescriptions[5].format = VK_FORMAT_R32G32B32_SFLOAT;
+		attributeDescriptions[5].offset = offsetof(DecomposedMatrix, offset_f);
 
 		return attributeDescriptions;
 	}

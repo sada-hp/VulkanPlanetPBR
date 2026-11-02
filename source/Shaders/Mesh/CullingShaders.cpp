@@ -2,6 +2,8 @@
 
 ShaderCodeDefinition(GShaders::CullCS)
 (
+\n #extension GL_EXT_scalar_block_layout : enable \n
+
 	struct DrawCommand
 	{
 		uint indexCount;
@@ -13,9 +15,13 @@ ShaderCodeDefinition(GShaders::CullCS)
 
 	struct MeshData
 	{
-		mat4 transform;
-		vec4 min;
-		vec4 max;
+		mat3 rotation;
+		
+		ivec3 positioni;
+		vec3  positionf;
+		
+		vec3 min;
+		vec3 max;
 	};
 
 	layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
@@ -25,7 +31,7 @@ ShaderCodeDefinition(GShaders::CullCS)
 		DrawCommand at[];
 	} commands;
 
-	layout(set = 1, binding = 0) readonly buffer mesh_data
+	layout(scalar, set = 1, binding = 0) readonly buffer mesh_data
 	{
 		MeshData at[];
 	} descriptors;
@@ -39,9 +45,13 @@ ShaderCodeDefinition(GShaders::CullCS)
 
 	uint frustumCull()
 	{
-		mat4 matrix = descriptors.at[gl_GlobalInvocationID.x].transform;
-		vec3 min = descriptors.at[gl_GlobalInvocationID.x].min.xyz;
-		vec3 max = descriptors.at[gl_GlobalInvocationID.x].max.xyz;
+		MeshData Mesh = descriptors.at[gl_GlobalInvocationID.x];
+
+		mat4 matrix = mat4(Mesh.rotation);
+		matrix[3].xyz = vec3(Mesh.positioni.xyz) + Mesh.positionf.xyz;
+
+		vec3 min = Mesh.min.xyz;
+		vec3 max = Mesh.max.xyz;
 
 		vec4 Box[8] = {
 			matrix * vec4(min.x, min.y, min.z, 1.0),

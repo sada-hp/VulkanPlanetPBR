@@ -1,5 +1,6 @@
 #pragma once
 #include "Factories/VkBufferFactory.hpp"
+#include "DecomposedMatrix.hpp"
 #include "EllipsoidMath.hpp"
 #include "WorldMatrix.hpp"
 
@@ -140,6 +141,19 @@ public:
 	std::shared_ptr<GVkBufferView> GetBufferGPU() const
 	{
 		return _gpuBuffer;
+	}
+
+	DecomposedMatrix GetDecompose() const
+	{
+		glm::mat3 rot = glm::mat3(matrix);
+		
+		glm::dvec4 p  = matrix[3];
+		p.w = 0.0;
+
+		glm::ivec4 pi = glm::ivec4(p);
+		glm::vec4  pf = p - glm::dvec4(pi);
+
+		return DecomposedMatrix{ rot, pi, pf };
 	}
 
 public:
