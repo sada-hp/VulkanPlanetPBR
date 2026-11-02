@@ -56,8 +56,10 @@ private:
 
 private:
 	void _submitRecording(_internalObj& object);
-	void _acquire(std::shared_ptr<IVkObj> obj);
+	void _reset(_internalObj& object);
 	
+	void _acquire(std::shared_ptr<IVkObj> obj);
+
 	_internalObj& _updateRecording(const VkCommandBufferInheritanceInfo* inheritance = VK_NULL_HANDLE);
 	void _nextSubpass();
 
@@ -110,6 +112,7 @@ public:
 	void NextSubpass();
 
 	void Execute(std::shared_ptr<GVkCommandBuffer> Commands);
+	void Reset();
 
 public:
 	template<std::derived_from<GVkBarrier> BarrierType, typename T, typename ...Args>

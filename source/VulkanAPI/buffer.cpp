@@ -134,7 +134,7 @@ void* GVkBuffer::Map(size_t Offset, size_t Size)
 		vmaInvalidateAllocation(Scope->GetAllocator(), object.memory, Offset, Size);
 		vmaMapMemory(Scope->GetAllocator(), object.memory, &allocInfo.pMappedData);
 
-		return allocInfo.pMappedData;
+		return (char*)allocInfo.pMappedData + Offset;
 	}
 
 	return nullptr;

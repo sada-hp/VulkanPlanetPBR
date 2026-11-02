@@ -38,18 +38,23 @@ GVkCommandBuffer::~GVkCommandBuffer()
 	}
 }
 
+void GVkCommandBuffer::_reset(_internalObj& object)
+{
+	object.acquired_resources.clear();
+	object.pipeline = VK_NULL_HANDLE;
+}
+
 GVkCommandBuffer::_internalObj& GVkCommandBuffer::_updateRecording(const VkCommandBufferInheritanceInfo* inheritance)
 {
 	auto& object = _activeObj();
 
 	if (!object.bRecording)
 	{
-		object.acquired_resources.clear();
-		object.pipeline = VK_NULL_HANDLE;
-		object.bRecorded  = false;
-		object.bRecording = true;
+		_reset(object);
 
 		object.fence->Wait();
+		object.bRecorded = false;
+		object.bRecording = true;
 
 		if (CheckFlag(m_cmdFlags, ECmdFlags::Secondary))
 		{
@@ -137,12 +142,25 @@ void GVkCommandBuffer::Submit()
 	_submitRecording(object);
 }
 
+void GVkCommandBuffer::Reset()
+{
+	Wait();
+
+	for (auto& object : m_flightResources)
+		_reset(object);
+}
+
 void GVkCommandBuffer::UpdateBuffer(std::shared_ptr<GVkBufferView> Buffer, char* Data)
 {
 	if (char* Mapped = (char*)Buffer->GetRoot()->Map())
 	{
 		memcpy(Mapped + Buffer->GetOffset(), Data, Buffer->GetSize());
 		Buffer->GetRoot()->UnMap();
+	}
+	else if (Buffer->GetSize() < 65384)
+	{
+		auto& object = _updateRecording();
+		vkCmdUpdateBuffer(object.cmd, Buffer->GetBuffer(), Buffer->GetOffset(), Buffer->GetSize(), Data);
 	}
 	else
 	{

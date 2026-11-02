@@ -177,4 +177,3 @@ std::shared_ptr<GVkDescriptorSet> IWorld::GetSceneIndirectSet() const
 
 	return _indirectSet;
 }
-

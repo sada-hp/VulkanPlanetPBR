@@ -32,6 +32,12 @@ public:
 		return _registry.get<T>(_id);
 	}
 
+	template<typename T>
+	inline T* TryGetComponent()
+	{
+		return _registry.try_get<T>(_id);
+	}
+
 	EllipsoidMatrix& GetTransform();
 
 	void SetPosition(const glm::dvec3& offset);
