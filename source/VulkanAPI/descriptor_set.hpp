@@ -1,5 +1,4 @@
 #pragma once
-#include "pipeline.hpp"
 #include "sampler.hpp"
 #include "buffer.hpp"
 #include "image.hpp"
@@ -37,7 +36,7 @@ private:
 	std::vector<std::shared_ptr<IVkObj>> m_sharedResources = {};
 	std::vector<_internalObj> m_flightResources = {};
 
-	VkDescriptorSetLayout m_descriptorSetLayout = VK_NULL_HANDLE;
+	std::shared_ptr<GVkDescriptorSetLayout> m_descriptorSetLayout = VK_NULL_HANDLE;
 	VkDescriptorPool m_descriptorSetPool = VK_NULL_HANDLE;
 
 private:
@@ -51,7 +50,7 @@ private:
 public:
 	virtual ~GVkDescriptorSet();
 
-	const VkDescriptorSetLayout& GetLayout() const { return m_descriptorSetLayout; };
+	std::shared_ptr<GVkDescriptorSetLayout> GetLayout() const { return m_descriptorSetLayout; };
 	const VkDescriptorSet& GetDescriptorSet() const;
 };
 

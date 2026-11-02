@@ -13,8 +13,8 @@ GCullingStage::GCullingStage(std::shared_ptr<RenderScope> Scope)
 
 	ComputePipelineDescriptor CSODesc{};
 	CSODesc.AddPushConstants<_shaderData>(VK_SHADER_STAGE_COMPUTE_BIT);
-	CSODesc.AddDescriptorLayout(LayoutIndirect->GetLayout());
-	CSODesc.AddDescriptorLayout(LayoutTransform->GetLayout());
+	CSODesc.AddDescriptorLayout(LayoutIndirect);
+	CSODesc.AddDescriptorLayout(LayoutTransform);
 	CSODesc.CS.AppendCode(GShaderUtils::UtilsCommon)
 		.AppendCode(GShaders::CullCS);
 	Pipeline = CSODesc.Construct(Scope);

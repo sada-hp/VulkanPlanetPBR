@@ -14,7 +14,7 @@ GMeshMaterial::GMeshMaterial(std::shared_ptr<RenderScope> Scope, const MaterialD
 	std::shared_ptr<GVkDescriptorSetLayout> Layout = DSLDesc.Construct(Scope);
 
 	GraphicsPipelineDescriptor PSODesc{};
-	PSODesc.AddDescriptorLayout(Layout->GetLayout());
+	PSODesc.AddDescriptorLayout(Layout);
 	PSODesc.SetRenderPass(RenderPass);
 	PSODesc.SetCullMode(Descriptor.CullMode, Descriptor.FrontFace)
 		.SetPrimitiveTopology(Descriptor.PrimitiveTopology)

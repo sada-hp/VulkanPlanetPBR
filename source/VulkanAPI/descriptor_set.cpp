@@ -202,8 +202,7 @@ std::shared_ptr<GVkDescriptorSet> DescriptorSetDescriptor::Allocate(std::shared_
 	descriptor->m_sharedResources = acquiredObjects;
 
 	auto layout = layoutDescriptor.Construct(Scope);
-	descriptor->m_descriptorSetLayout = layout->GetLayout();
-	descriptor->m_sharedResources.emplace_back(layout);
+	descriptor->m_descriptorSetLayout = layout;
 
 	uint32_t FlightCount = bIsInFlight ? Scope->GetMaxFramesInFlight() : 1;
 
@@ -232,7 +231,7 @@ std::shared_ptr<GVkDescriptorSet> DescriptorSetDescriptor::Allocate(std::shared_
 
 		VkDescriptorSetAllocateInfo setAllocInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
 		setAllocInfo.descriptorPool = descriptor->m_descriptorSetPool;
-		setAllocInfo.pSetLayouts = &descriptor->m_descriptorSetLayout;
+		setAllocInfo.pSetLayouts = &layout->GetLayout();
 		setAllocInfo.descriptorSetCount = 1;
 		setAllocInfo.pNext = layoutDescriptor.bVariable ? &variableAllocateInfo : nullptr;
 		auto res = vkAllocateDescriptorSets(Scope->GetDevice(), &setAllocInfo, &object.set);

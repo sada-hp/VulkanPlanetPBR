@@ -1,4 +1,5 @@
 #pragma once
+#include "descriptor_set.hpp"
 #include "render_pass.hpp"
 #include "shader.hpp"
 #include "scope.hpp"
@@ -7,6 +8,8 @@ class GVkRenderPass;
 
 class GVkPipeline : public IVkObj
 {
+	friend class GraphicsPipelineDescriptor;
+	friend class ComputePipelineDescriptor;
 	friend class GVkCommandBuffer;
 
 private:
@@ -16,16 +19,19 @@ private:
 	VkPipeline m_pipeline = VK_NULL_HANDLE;
 	VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
 	std::shared_ptr<RenderScope> Scope = VK_NULL_HANDLE;
+
 	std::vector<VkPushConstantRange> pushConstants;
+	std::vector<std::shared_ptr<GVkDescriptorSetLayout>> descriptorLayouts;
 
 private:
 	const std::vector<VkPushConstantRange>& _getPushConstants() const {
 		return pushConstants;
 	};
 
-public:
 	GVkPipeline(std::shared_ptr<RenderScope> Scope, VkPipelineLayoutCreateInfo LayoutInfo, VkGraphicsPipelineCreateInfo CreateInfo, VkPipelineCache Cache);
 	GVkPipeline(std::shared_ptr<RenderScope> Scope, VkPipelineLayoutCreateInfo LayoutInfo, VkComputePipelineCreateInfo CreateInfo, VkPipelineCache Cache = VK_NULL_HANDLE);
+
+public:
 	virtual ~GVkPipeline();
 
 	const VkPipelineLayout& GetLayout() const { return m_pipelineLayout; };
@@ -38,7 +44,7 @@ public:
 class IPipelineDescriptor
 {
 protected:
-	std::vector<VkDescriptorSetLayout> descriptorLayouts{};
+	std::vector<std::shared_ptr<GVkDescriptorSetLayout>> descriptorLayouts{};
 	std::vector<VkPushConstantRange> pushConstants;
 
 public:
@@ -61,7 +67,7 @@ public:
 		pushConstants.push_back(range);
 	}
 
-	void AddDescriptorLayout(VkDescriptorSetLayout layout)
+	void AddDescriptorLayout(std::shared_ptr<GVkDescriptorSetLayout> layout)
 	{
 		descriptorLayouts.push_back(layout);
 	}

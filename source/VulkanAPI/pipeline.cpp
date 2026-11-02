@@ -42,11 +42,15 @@ std::string ComputePipelineDescriptor::HashString() const
 
 std::shared_ptr<GVkPipeline> ComputePipelineDescriptor::Construct(std::shared_ptr<RenderScope> Scope)
 {
+	std::vector<VkDescriptorSetLayout> layouts;
+	for (auto& layout : descriptorLayouts)
+		layouts.push_back(layout->GetLayout());
+
 	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-	pipelineLayoutCreateInfo.setLayoutCount = descriptorLayouts.size();
-	pipelineLayoutCreateInfo.pSetLayouts = descriptorLayouts.data();
 	pipelineLayoutCreateInfo.pushConstantRangeCount = pushConstants.size();
 	pipelineLayoutCreateInfo.pPushConstantRanges = pushConstants.data();
+	pipelineLayoutCreateInfo.setLayoutCount = layouts.size();
+	pipelineLayoutCreateInfo.pSetLayouts = layouts.data();
 
 	VkComputePipelineCreateInfo pipelineCreateInfo{ VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
 	pipelineCreateInfo.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -54,7 +58,10 @@ std::shared_ptr<GVkPipeline> ComputePipelineDescriptor::Construct(std::shared_pt
 	pipelineCreateInfo.stage.module = Scope->GetCache(CS);
 	pipelineCreateInfo.stage.pName = "main";
 
-	return std::make_shared<GVkPipeline>(Scope, pipelineLayoutCreateInfo, pipelineCreateInfo, Scope->GetCache(*this));
+	auto pipe = std::shared_ptr<GVkPipeline>(new GVkPipeline(Scope, pipelineLayoutCreateInfo, pipelineCreateInfo, Scope->GetCache(*this)));
+	pipe->descriptorLayouts = descriptorLayouts;
+
+	return pipe;
 }
 
 GraphicsPipelineDescriptor& GraphicsPipelineDescriptor::SetVertexInputBindings(const std::vector<VkVertexInputBindingDescription>& bindings)
@@ -198,12 +205,16 @@ std::string GraphicsPipelineDescriptor::HashString() const
 
 std::shared_ptr<GVkPipeline> GraphicsPipelineDescriptor::Construct(std::shared_ptr<RenderScope> Scope)
 {
+	std::vector<VkDescriptorSetLayout> layouts;
+	for (auto& layout : descriptorLayouts)
+		layouts.push_back(layout->GetLayout());
+
 	VkPipelineLayoutCreateInfo pipelineLayoutCI{};
 	pipelineLayoutCI.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	pipelineLayoutCI.setLayoutCount = descriptorLayouts.size();
-	pipelineLayoutCI.pSetLayouts = descriptorLayouts.data();
 	pipelineLayoutCI.pushConstantRangeCount = pushConstants.size();
 	pipelineLayoutCI.pPushConstantRanges = pushConstants.data();
+	pipelineLayoutCI.setLayoutCount = layouts.size();
+	pipelineLayoutCI.pSetLayouts = layouts.data();
 
 	blendState.attachmentCount = blendAttachments.size();
 	blendState.pAttachments = blendAttachments.data();
@@ -254,5 +265,8 @@ std::shared_ptr<GVkPipeline> GraphicsPipelineDescriptor::Construct(std::shared_p
 	pipelineCI.stageCount = shaderStages.size();
 	pipelineCI.pStages = shaderStages.data();
 
-	return std::make_shared<GVkPipeline>(Scope, pipelineLayoutCI, pipelineCI, Scope->GetCache(*this));
+	auto pipe = std::shared_ptr<GVkPipeline>(new GVkPipeline(Scope, pipelineLayoutCI, pipelineCI, Scope->GetCache(*this)));
+	pipe->descriptorLayouts = descriptorLayouts;
+
+	return pipe;
 }
