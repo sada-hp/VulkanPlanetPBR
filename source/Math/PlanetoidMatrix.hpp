@@ -31,8 +31,8 @@ private:
 
 		if (_gpuBuffer)
 		{
-			glm::mat4 _compressed = matrix;
-			memcpy(_gpuBuffer->Map(), &_compressed, sizeof(_compressed));
+			DecomposedMatrix decomposed = GetDecompose();
+			memcpy(_gpuBuffer->Map(), &decomposed, sizeof(decomposed));
 			_gpuBuffer->UnMap();
 		}
 

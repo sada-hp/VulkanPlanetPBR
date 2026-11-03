@@ -16,6 +16,8 @@
 GVulkanBase::GVulkanBase(GLFWwindow* window)
 {
 	m_Scope = std::make_shared<RenderScope>();
+	m_FrameGraph = std::make_shared<GFrameGraph>(m_Scope);
+
 	m_Swapchain = std::make_shared<GVkSwapchain>(m_Scope, window);
 	m_BlitCommandBuffer = std::make_shared<GVkCommandBuffer>(m_Scope, VK_QUEUE_GRAPHICS_BIT, ECmdFlags::InFlight);
 	m_DrawCommandBuffer = std::make_shared<GVkCommandBuffer>(m_Scope, VK_QUEUE_GRAPHICS_BIT, ECmdFlags::InFlight);
@@ -29,18 +31,16 @@ GVulkanBase::GVulkanBase(GLFWwindow* window)
 	GAtmospherePrecomputeLUT::Execute(m_Scope);
 
 	// render stages
-	AddRenderStage<GAttachmentsClear>();
 	AddRenderStage<GCloudsStage>();
 	AddRenderStage<GCullingStage>();
 	AddRenderStage<GMeshStage>();
 	AddRenderStage<GAtmosphereStage>();
 	AddRenderStage<GTonemapStage>();
+	AddRenderStage<GAttachmentsClear>();
 }
 
 GVulkanBase::~GVulkanBase()
 {
-	for (auto& Stage : m_RenderStages)
-		delete Stage;
 }
 
 bool GVulkanBase::Draw(const GCamera& Camera, const IWorld& World)
@@ -72,8 +72,7 @@ bool GVulkanBase::Draw(const GCamera& Camera, const IWorld& World)
 		memcpy(GVkSharedResources::Instance.UBO->Map(), &UBO, sizeof(UBO));
 		GVkSharedResources::Instance.UBO->UnMap();
 
-		for (auto& Stage : m_RenderStages)
-			Stage->Execute(Camera, World);
+		m_FrameGraph->Draw(Camera, World);
 
 		m_BlitCommandBuffer->BlitImage(GVkImage::ToView(GVkSharedResources::Instance.FinalTarget), m_Swapchain);
 		m_BlitCommandBuffer->Submit();

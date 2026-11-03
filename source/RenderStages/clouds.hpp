@@ -26,9 +26,11 @@ private:
 
 protected:
 	std::shared_ptr<GVkImage> _generate_noise(const std::string& shader, VkFormat Format, VkExtent3D extents, uint32_t freq, uint32_t octaves);
+	
+	void setup_dependencies(const IWorld& World) override;
+	void record(const GCamera& Camera, const IWorld& World) override;
 
 public:
 	GCloudsStage(std::shared_ptr<RenderScope> Scope);
 	virtual ~GCloudsStage();
-	void Execute(const GCamera& Camera, const IWorld& World) override;
 };

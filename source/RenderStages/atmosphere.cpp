@@ -1,11 +1,17 @@
 #include "atmosphere.hpp"
 #include "Factories/VkSamplerFactory.hpp"
 
+void GAtmosphereStage::setup_dependencies(const IWorld& World)
+{
+	auto color_view = GVkImage::ToView(GVkSharedResources::Instance.ColorBuffer);
+	Resources.add(color_view, EResourceOp::ReadWrite, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT);
+}
+
 GAtmosphereStage::GAtmosphereStage(std::shared_ptr<RenderScope> Scope)
 	: IRenderStage(Scope, VK_QUEUE_GRAPHICS_BIT)
 {
 	RenderPassDescriptor RPDesc{};
-	RPDesc.AddAttachmentLoadOp(GVkSharedResources::Instance.ColorBuffer->GetFormat(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+	RPDesc.AddAttachmentLoadOp(GVkSharedResources::Instance.ColorBuffer->GetFormat(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 	RenderPass = RPDesc.Construct(Scope);
 
 	Framebuffer = std::make_shared<GVkFramebuffer>(Scope, RenderPass, std::vector{ GVkSharedResources::Instance.ColorBuffer });
@@ -37,11 +43,13 @@ GAtmosphereStage::~GAtmosphereStage()
 {
 }
 
-void GAtmosphereStage::Execute(const GCamera& Camera, const IWorld& World)
+void GAtmosphereStage::record(const GCamera& Camera, const IWorld& World)
 {
 	CommandBuffer->BeginRenderPass(RenderPass, Framebuffer);
+
 	CommandBuffer->BindPipeline(Pipeline);
 	CommandBuffer->BindDescriptorSet(0, DescriptorSet);
 	CommandBuffer->Draw(3);
-	CommandBuffer->Submit();
+
+	CommandBuffer->EndRenderPass();
 }

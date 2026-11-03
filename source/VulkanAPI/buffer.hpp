@@ -24,6 +24,7 @@ class GVkBufferView;
 class GVkBuffer : public IVkObj
 {
 	friend class GVkBufferView;
+	friend class GVkBarrier;
 
 	struct _internalObj
 	{
@@ -57,6 +58,7 @@ public:
 
 	size_t GetSize() const;
 	const VkBuffer& GetBuffer() const;
+	uint32_t FlightCount() const { return m_flightResources.size(); }
 
 	bool CanMap() const;
 	void UnMap(size_t Offset = 0, size_t Size = VK_WHOLE_SIZE);
@@ -74,6 +76,12 @@ private:
 
 public:
 	GVkBufferView(std::shared_ptr<GVkBuffer> Buffer, size_t Offset = 0, size_t Size = VK_WHOLE_SIZE);
+	virtual ~GVkBufferView() {};
+
+	bool operator==(const GVkBufferView& other) const
+	{
+		return m_Buffer == other.m_Buffer && m_Offset == other.m_Offset && m_Size == other.m_Size;
+	}
 
 	const VkBuffer& At(size_t index) const { return m_Buffer->At(index); }
 	const VkBuffer& GetBuffer() const { return m_Buffer->GetBuffer(); }

@@ -42,11 +42,18 @@ void Queue::freeCommandBuffer(VkCommandBuffer cmd) const
 	vkFreeCommandBuffers(m_vkDevice, m_CmdPool, 1, &cmd);
 }
 
-void Queue::submitCommandBuffer(VkCommandBuffer cmd, VkFence fence) const
+void Queue::submitCommandBuffer(VkCommandBuffer cmd, VkFence fence, const std::vector<VkSemaphore>& waitSemaphores, const std::vector<VkPipelineStageFlags>& waitStages, const std::vector<VkSemaphore>& signalSemaphores) const
 {
 	VkSubmitInfo submitInfo{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &cmd;
+
+	submitInfo.waitSemaphoreCount = waitSemaphores.size();
+	submitInfo.pWaitSemaphores = waitSemaphores.data();
+	submitInfo.pWaitDstStageMask = waitStages.data();
+
+	submitInfo.signalSemaphoreCount = signalSemaphores.size();
+	submitInfo.pSignalSemaphores = signalSemaphores.data();
 
 	vkQueueSubmit(m_vkQueue, 1, &submitInfo, fence);
 }

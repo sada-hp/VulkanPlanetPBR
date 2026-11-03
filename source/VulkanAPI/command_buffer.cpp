@@ -3,6 +3,8 @@
 GVkCommandBuffer::GVkCommandBuffer(std::shared_ptr<RenderScope> InScope, VkQueueFlagBits Queue, ECmdFlags Flags)
 	: Scope(InScope), m_qFlags(Queue), m_cmdFlags(Flags)
 {
+	m_qFlags = Scope->ActualQueueType(m_qFlags);
+
 	if (CheckFlag(Flags, ECmdFlags::InFlight))
 		m_flightResources.resize(Scope->GetMaxFramesInFlight());
 	else
@@ -30,7 +32,7 @@ GVkCommandBuffer::~GVkCommandBuffer()
 	for (auto& object : m_flightResources)
 	{
 		if (object.bRecording)
-			_submitRecording(object);
+			_submitRecording(object, {}, {}, {});
 
 		object.fence->Wait();
 
@@ -76,7 +78,7 @@ GVkCommandBuffer::_internalObj& GVkCommandBuffer::_updateRecording(const VkComma
 	return object;
 }
 
-void GVkCommandBuffer::_submitRecording(_internalObj& object)
+void GVkCommandBuffer::_submitRecording(_internalObj& object, const std::vector<VkSemaphore>& waitSemaphores, const std::vector<VkPipelineStageFlags>& waitStages, const std::vector<VkSemaphore>& signalSemaphores)
 {
 	if (object.bRecording)
 	{
@@ -88,7 +90,7 @@ void GVkCommandBuffer::_submitRecording(_internalObj& object)
 		if (!CheckFlag(m_cmdFlags, ECmdFlags::Secondary))
 		{
 			object.fence->Reset();
-			Scope->GetQueue(m_qFlags).submitCommandBuffer(object.cmd, object.fence->GetFence());
+			Scope->GetQueue(m_qFlags).submitCommandBuffer(object.cmd, object.fence->GetFence(), waitSemaphores, waitStages, signalSemaphores);
 		}
 
 		object.pipeline = VK_NULL_HANDLE;
@@ -97,13 +99,13 @@ void GVkCommandBuffer::_submitRecording(_internalObj& object)
 	}
 }
 
-void GVkCommandBuffer::_nextSubpass()
+void GVkCommandBuffer::_nextSubpass(VkSubpassContents Contents)
 {
 	auto& object = _activeObj();
 
 	if (object.renderPass)
 	{
-		vkCmdNextSubpass(object.cmd, VK_SUBPASS_CONTENTS_INLINE);
+		vkCmdNextSubpass(object.cmd, Contents);
 		object.activeSubpass++;
 	}
 }
@@ -130,16 +132,46 @@ bool GVkCommandBuffer::IsRecorded()
 	return false;
 }
 
+bool GVkCommandBuffer::IsRecording()
+{
+	auto& object = _activeObj();
+	return object.bRecording;
+}
+
 void GVkCommandBuffer::Wait()
 {
 	for (auto& object : m_flightResources)
 		object.fence->Wait();
 }
 
-void GVkCommandBuffer::Submit()
+void GVkCommandBuffer::Submit(const std::vector<std::shared_ptr<GVkSemaphore>>& inWaitSemaphores, const std::vector<std::shared_ptr<GVkSemaphore>>& inSignalSemaphores)
 {
 	auto& object = _activeObj();
-	_submitRecording(object);
+
+	std::vector<VkSemaphore> waitSemaphores;
+	std::vector<VkSemaphore> signalSemaphores;
+	std::vector<VkPipelineStageFlags> waitStages;
+
+	for (auto& semaphore : inWaitSemaphores)
+	{
+		if (auto sem = semaphore->GetWaitSemaphore())
+		{
+			waitStages.push_back(semaphore->GetPipelineStage());
+			waitSemaphores.push_back(sem);
+		}
+
+		_acquire(semaphore);
+	}
+
+	for (auto& semaphore : inSignalSemaphores)
+	{
+		if (auto sem = semaphore->GetSignalSemaphore())
+			signalSemaphores.push_back(sem);
+
+		_acquire(semaphore);
+	}
+
+	_submitRecording(object, waitSemaphores, waitStages, signalSemaphores);
 }
 
 void GVkCommandBuffer::Reset()
@@ -157,7 +189,7 @@ void GVkCommandBuffer::UpdateBuffer(std::shared_ptr<GVkBufferView> Buffer, char*
 		memcpy(Mapped + Buffer->GetOffset(), Data, Buffer->GetSize());
 		Buffer->GetRoot()->UnMap();
 	}
-	else if (Buffer->GetSize() < 65384)
+	else if (Buffer->GetSize() < 65536 && Buffer->GetOffset() % 4 == 0 && Buffer->GetSize() % 4 == 0)
 	{
 		auto& object = _updateRecording();
 		vkCmdUpdateBuffer(object.cmd, Buffer->GetBuffer(), Buffer->GetOffset(), Buffer->GetSize(), Data);
@@ -346,10 +378,14 @@ void GVkCommandBuffer::BeginRenderPass(std::shared_ptr<GVkRenderPass> RenderPass
 		{
 			uint32_t index = 0;
 			auto& views = object.framebuffer->GetViews();
+
 			for (auto& view : views)
 			{
 				auto attState = object.renderPass->_getAttachmentState(index);
-				BindBarrier<GVkBarrier>(view, attState.initial_layout, attState.initial_stage, attState.initial_access);
+
+				if (attState.initial_layout != VK_IMAGE_LAYOUT_UNDEFINED && view->_getImageState(view->BaseLevel(), view->BaseLayer()).layout != attState.initial_layout)
+					BindBarrier<GVkBarrier>(view, attState.next_layout, attState.next_stage, attState.next_access);
+
 				index++;
 			}
 
@@ -387,12 +423,12 @@ void GVkCommandBuffer::SetRenderArea(const VkRect2D& Scissor, const VkViewport& 
 	}
 }
 
-void GVkCommandBuffer::NextSubpass()
+void GVkCommandBuffer::NextSubpass(VkSubpassContents Contents)
 {
 	auto& object = _activeObj();
 
 	assert(object.renderPass);
-	_nextSubpass();
+	_nextSubpass(Contents);
 }
 
 void GVkCommandBuffer::EndRenderPass()
@@ -404,7 +440,7 @@ void GVkCommandBuffer::EndRenderPass()
 		if (!CheckFlag(m_cmdFlags, ECmdFlags::Secondary))
 		{
 			while (object.activeSubpass < (object.renderPass->GetSubpassCount() - 1))
-				_nextSubpass();
+				_nextSubpass(VK_SUBPASS_CONTENTS_INLINE);
 
 			vkCmdEndRenderPass(object.cmd);
 
@@ -415,7 +451,10 @@ void GVkCommandBuffer::EndRenderPass()
 			{
 				auto attState = object.renderPass->_getAttachmentState(index);
 				view->_setImageState(attState.final_layout, attState.final_stage, attState.final_access);
-				BindBarrier<GVkBarrier>(view, attState.next_layout, attState.next_stage, attState.next_access);
+
+				if (attState.final_layout != attState.next_layout)
+					BindBarrier<GVkBarrier>(view, attState.next_layout, attState.next_stage, attState.next_access);
+
 				index++;
 			}
 		}
@@ -440,7 +479,7 @@ void GVkCommandBuffer::BindPipeline(std::shared_ptr<GVkPipeline> Pipeline)
 			assert(object.pipeline->GetSubpass() < object.renderPass->GetSubpassCount());
 
 			while (object.activeSubpass < object.pipeline->GetSubpass())
-				_nextSubpass();
+				_nextSubpass(VK_SUBPASS_CONTENTS_INLINE);
 		}
 
 		vkCmdBindPipeline(object.cmd, Pipeline->GetBindPoint(), Pipeline->GetPipeline());

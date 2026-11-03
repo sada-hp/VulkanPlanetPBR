@@ -2,6 +2,20 @@
 #include "Factories/VkImageFactory.hpp"
 #include "Factories/VkSamplerFactory.hpp"
 
+void GMeshStage::setup_dependencies(const IWorld& World)
+{
+	auto color_view = GVkImage::ToView(GVkSharedResources::Instance.ColorBuffer);
+	Resources.add(color_view, EResourceOp::ReadWrite, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT);
+
+	auto depth_view = GVkImage::ToView(GVkSharedResources::Instance.DepthBuffer);
+	Resources.add(depth_view, EResourceOp::ReadWrite, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT, VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+
+	auto indirect_view = World.GetSceneIndirectBuffer();
+	Resources.add(indirect_view, EResourceOp::ReadOnly, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_2_CONDITIONAL_RENDERING_BIT_EXT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_2_CONDITIONAL_RENDERING_READ_BIT_EXT);
+
+	Commands.Draw = std::make_shared<GVkCommandBuffer>(Scope, VK_QUEUE_GRAPHICS_BIT, ECmdFlags::InFlight | ECmdFlags::Secondary);
+}
+
 GMeshStage::GMeshStage(std::shared_ptr<RenderScope> Scope)
 	: IRenderStage(Scope, VK_QUEUE_GRAPHICS_BIT)
 {
@@ -26,6 +40,16 @@ GMeshStage::GMeshStage(std::shared_ptr<RenderScope> Scope)
 GMeshStage::~GMeshStage()
 {
 
+}
+
+bool GMeshStage::IsActive(const IWorld& World)
+{
+	auto storage = World.GetRegistry().storage<GDrawable>();
+
+	if (storage && !storage->empty())
+		return true;
+
+	return false;
 }
 
 void GMeshStage::_initDrawPass()
@@ -65,23 +89,60 @@ void GMeshStage::_initCompositePass()
 	Pipelines.Composite = PSODesc.Construct(Scope);
 }
 
-void GMeshStage::Execute(const GCamera& Camera, const IWorld& World)
+void GMeshStage::_exeuteSecondary(const IWorld& World)
+{
+	if (!Commands.Draw->IsRecorded())
+	{
+		auto view = World.GetRegistry().view<EllipsoidMatrix, GDrawable>();
+		
+		Commands.Draw->BeginRenderPass(RenderPass, Framebuffer);
+		for (const auto& [ent, matrix, draw] : view.each())
+		{
+			Commands.Draw->BeginConditionalRendering(draw._conditionalView);
+			{
+				Commands.Draw->BindVertexBuffer(0, draw.Mesh->VertexBuffer());
+				Commands.Draw->BindVertexBuffer(1, matrix.GetBufferGPU());
+
+				bool IsIndexed = draw.Mesh->IndexCount() > 0;
+
+				if (IsIndexed)
+					Commands.Draw->BindIndexBuffer(draw.Mesh->IndexType(), draw.Mesh->IndexBuffer());
+
+				for (auto& material : draw.Materials)
+				{
+					Commands.Draw->BindPipeline(material->GetPipeline());
+					Commands.Draw->BindDescriptorSet(0, Descriptors.Draw);
+
+					if (auto descriptorset = material->GetDescriptorSet())
+						Commands.Draw->BindDescriptorSet(1, descriptorset);
+
+					if (IsIndexed)
+						Commands.Draw->DrawIndirectIndexed(draw._indirectCallView);
+					else
+						Commands.Draw->DrawIndirect(draw._indirectCallView);
+				}
+			}
+			Commands.Draw->EndConditionalRendering();
+		}
+
+		Commands.Draw->Submit();
+	}
+
+	CommandBuffer->Execute(Commands.Draw);
+}
+
+void GMeshStage::record(const GCamera& Camera, const IWorld& World)
 {
 	auto view = World.GetRegistry().view<EllipsoidMatrix, GDrawable>();
-
-	if (view.size_hint() == 0)
-		return;
 
 	VkRect2D Scissor = Framebuffer->GetRenderArea();
 	VkViewport Viewport = { 0, 0, Scissor.extent.width, Scissor.extent.height, 0.0, 1.0 };
 
-	CommandBuffer->Execute(World.GetPrerecordedSyncCommands());
-
 	CommandBuffer->BeginRenderPass(RenderPass, Framebuffer, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
-	CommandBuffer->Execute(World.GetPrerecordedDrawCommands(RenderPass, Framebuffer, Descriptors.Draw));
+	_exeuteSecondary(World);
 
-	CommandBuffer->NextSubpass();
+	CommandBuffer->NextSubpass(VK_SUBPASS_CONTENTS_INLINE);
 
 	CommandBuffer->SetRenderArea(Scissor, Viewport);
 
@@ -89,5 +150,5 @@ void GMeshStage::Execute(const GCamera& Camera, const IWorld& World)
 	CommandBuffer->BindDescriptorSet(0, Descriptors.Composite);
 	CommandBuffer->Draw(3);
 
-	CommandBuffer->Submit();
+	CommandBuffer->EndRenderPass();
 }

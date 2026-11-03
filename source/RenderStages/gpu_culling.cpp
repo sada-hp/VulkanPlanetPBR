@@ -1,7 +1,13 @@
 #include "gpu_culling.hpp"
 
+void GCullingStage::setup_dependencies(const IWorld& World)
+{
+	auto indirect_view = World.GetSceneIndirectBuffer();
+	Resources.add(indirect_view, EResourceOp::WriteOnly, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_WRITE_BIT);
+}
+
 GCullingStage::GCullingStage(std::shared_ptr<RenderScope> Scope)
-	: IRenderStage(Scope, VK_QUEUE_GRAPHICS_BIT)
+	: IRenderStage(Scope, VK_QUEUE_COMPUTE_BIT)
 {
 	DescriptorLayoutDescriptor DSLDescIndirect;
 	DSLDescIndirect.AddStorageBuffer(VK_SHADER_STAGE_COMPUTE_BIT);
@@ -17,6 +23,7 @@ GCullingStage::GCullingStage(std::shared_ptr<RenderScope> Scope)
 	CSODesc.AddDescriptorLayout(LayoutTransform);
 	CSODesc.CS.AppendCode(GShaderUtils::UtilsCommon)
 		.AppendCode(GShaders::CullCS);
+
 	Pipeline = CSODesc.Construct(Scope);
 }
 
@@ -24,13 +31,19 @@ GCullingStage::~GCullingStage()
 {
 }
 
-void GCullingStage::Execute(const GCamera& Camera, const IWorld& World)
+bool GCullingStage::IsActive(const IWorld& World)
+{
+	auto storage = World.GetRegistry().storage<GDrawable>();
+
+	if (storage && !storage->empty())
+		return true;
+
+	return false;
+}
+
+void GCullingStage::record(const GCamera& Camera, const IWorld& World)
 {
 	uint32_t Count = World.GetRegistry().view<GDrawable, EllipsoidMatrix>().size_hint();
-
-	if (Count == 0)
-		return;
-
 	uint32_t Invocations = (Count / 32) + uint32_t(Count % 32 > 0);
 
 	_shaderData Data{};
@@ -53,5 +66,4 @@ void GCullingStage::Execute(const GCamera& Camera, const IWorld& World)
 	CommandBuffer->BindDescriptorSet(0, World.GetSceneIndirectSet());
 	CommandBuffer->BindDescriptorSet(1, World.GetSceneTransformsSet());
 	CommandBuffer->Dispatch(Invocations, 1, 1);
-	CommandBuffer->Submit();
 }

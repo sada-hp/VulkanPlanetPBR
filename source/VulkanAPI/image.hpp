@@ -107,10 +107,8 @@ private:
 private:
 	uint32_t _mapIndex(int32_t index) const
 	{
-		if (m_shuffle != 0)
-			int k = 0;
-
 		index += m_shuffle;
+
 		if (index < 0)
 			index = m_flightResources.size() + index;
 
@@ -128,7 +126,15 @@ protected:
 
 public:
 	GVkImageView(std::shared_ptr<GVkImage> Image, VkImageSubresourceRange Range, VkImageViewType Type, int32_t shuffle = 0);
-	~GVkImageView();
+	virtual ~GVkImageView();
+
+	bool operator==(const GVkImageView& other) const
+	{
+		return m_Image == other.m_Image && m_type == other.m_type && m_shuffle == other.m_shuffle
+			&& GetLayerCount() == other.GetLayerCount() && GetLevelCount() == other.GetLevelCount()
+			&& BaseLayer() == other.BaseLayer() && BaseLevel() == other.BaseLevel()
+			&& m_Subresource.aspectMask == other.m_Subresource.aspectMask;
+	}
 
 	const VkImageView& At(size_t index) const { return m_flightResources[_mapIndex(index)].view; }
 	const VkImageView& GetImageView() const { return m_flightResources[_activeIndex()].view; }

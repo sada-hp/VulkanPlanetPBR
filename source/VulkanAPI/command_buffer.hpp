@@ -5,6 +5,7 @@
 #include "buffer.hpp"
 #include "barrier.hpp"
 #include "pipeline.hpp"
+#include "semaphore.hpp"
 #include "swapchain.hpp"
 #include "framebuffer.hpp"
 #include "render_pass.hpp"
@@ -55,24 +56,27 @@ private:
 	_internalObj& _activeObj() { return m_flightResources[_activeIndex()]; }
 
 private:
-	void _submitRecording(_internalObj& object);
+	void _submitRecording(_internalObj& object, const std::vector<VkSemaphore>& waitSemaphores, const std::vector<VkPipelineStageFlags>& waitStages, const std::vector<VkSemaphore>& signalSemaphores);
 	void _reset(_internalObj& object);
 	
 	void _acquire(std::shared_ptr<IVkObj> obj);
 
 	_internalObj& _updateRecording(const VkCommandBufferInheritanceInfo* inheritance = VK_NULL_HANDLE);
-	void _nextSubpass();
+	void _nextSubpass(VkSubpassContents Contents);
 
 public:
 	GVkCommandBuffer(std::shared_ptr<RenderScope> Scope, VkQueueFlagBits Queue, ECmdFlags Flags = ECmdFlags::Default);
 	~GVkCommandBuffer();
 
+	VkQueueFlagBits GetType() const { return m_qFlags; }
 	VkCommandBuffer GetCommandBuffer();
 
 	bool IsRecorded();
+	bool IsRecording();
 
 	void Wait();
-	void Submit();
+	void Submit(const std::vector<std::shared_ptr<GVkSemaphore>>& waitSemaphores = {}, const std::vector<std::shared_ptr<GVkSemaphore>>& signalSemaphores = {});
+
 	void BlitImage(std::shared_ptr<GVkImageView> Image, std::shared_ptr<GVkSwapchain> Swapchain);
 	void BlitImage(std::shared_ptr<GVkImageView> Source, std::shared_ptr<GVkImageView> Destination);
 
@@ -109,7 +113,7 @@ public:
 	void EndConditionalRendering();
 
 	void SetRenderArea(const VkRect2D& Scissor, const VkViewport& Viewport);
-	void NextSubpass();
+	void NextSubpass(VkSubpassContents Contents = VK_SUBPASS_CONTENTS_INLINE);
 
 	void Execute(std::shared_ptr<GVkCommandBuffer> Commands);
 	void Reset();

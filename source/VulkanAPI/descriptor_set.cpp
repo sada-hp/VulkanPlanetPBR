@@ -1,6 +1,6 @@
 #include "descriptor_set.hpp"
 
-#define MAX_DESCRIPTOR_SIZE 65384
+#define MAX_DESCRIPTOR_SIZE 65536
 
 static uint32_t _clampToCapability(std::shared_ptr<RenderScope> Scope, VkDescriptorType type, uint32_t size)
 {

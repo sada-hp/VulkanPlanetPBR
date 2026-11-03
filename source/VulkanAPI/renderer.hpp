@@ -3,28 +3,19 @@
 #include "scope.hpp"
 #include "command_buffer.hpp"
 #include "shared_resources.hpp"
+#include "FrameGraph/frame_graph.hpp"
 #include "RenderStages/IRenderStage.hpp"
-
-struct GFrameData
-{
-	GCamera& Camera;
-
-	size_t count = 0;
-	GDrawable* objects = VK_NULL_HANDLE;
-};
 
 class GVulkanBase
 {
 	friend class GWindow;
 
-private:
+protected:
+	std::shared_ptr<GFrameGraph> m_FrameGraph = nullptr;
 	std::shared_ptr<RenderScope> m_Scope = VK_NULL_HANDLE;
 	std::shared_ptr<GVkSwapchain> m_Swapchain = VK_NULL_HANDLE;
 	std::shared_ptr<GVkCommandBuffer> m_BlitCommandBuffer = VK_NULL_HANDLE;
 	std::shared_ptr<GVkCommandBuffer> m_DrawCommandBuffer = VK_NULL_HANDLE;
-
-protected:
-	std::vector<IRenderStage*> m_RenderStages = {};
 
 protected:
 	GVulkanBase(GLFWwindow* window);
@@ -37,6 +28,6 @@ public:
 	template<typename T, typename ...Args>
 	inline void AddRenderStage(Args&& ...args)
 	{
-		m_RenderStages.push_back(new T(m_Scope, args...));
+		m_FrameGraph->AddStage<T>(m_Scope, args...);
 	}
 };

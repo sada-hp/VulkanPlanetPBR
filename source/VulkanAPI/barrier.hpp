@@ -3,6 +3,13 @@
 #include "buffer.hpp"
 #include "image.hpp"
 
+enum class EOwnershipType
+{
+	Ignored,
+	Acquire,
+	Release
+};
+
 class GVkBarrier : public IVkObj
 {
 protected:
@@ -10,41 +17,29 @@ protected:
 	std::shared_ptr<GVkBufferView> Buffer = VK_NULL_HANDLE;
 	std::shared_ptr<GVkImageView> Image = VK_NULL_HANDLE;
 
-	VkQueueFlags srcQueue = VK_QUEUE_FAMILY_IGNORED;
-	VkQueueFlags dstQueue = VK_QUEUE_FAMILY_IGNORED;
+	uint32_t srcQueue = VK_QUEUE_FAMILY_IGNORED;
+	uint32_t dstQueue = VK_QUEUE_FAMILY_IGNORED;
 
 	VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-	VkPipelineStageFlags2 barrierStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	VkPipelineStageFlags2 barrierStage = VK_PIPELINE_STAGE_FLAG_BITS_MAX_ENUM;
 	VkAccessFlags2 barrierAccess = VK_ACCESS_NONE;
+	mutable std::vector<bool> ownershipReleasedFlags;
 
 protected:
-	VkPipelineStageFlags2 _evalStage(VkShaderStageFlags Shader)
-	{
-		switch (Shader)
-		{
-		case VK_SHADER_STAGE_COMPUTE_BIT:
-			return VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-		case VK_SHADER_STAGE_FRAGMENT_BIT:
-			return VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-		case VK_SHADER_STAGE_VERTEX_BIT:
-			return VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT;
-		case VK_SHADER_STAGE_GEOMETRY_BIT:
-			return VK_PIPELINE_STAGE_2_GEOMETRY_SHADER_BIT;
-		default:
-			return VK_PIPELINE_STAGE_2_NONE;
-		}
-	}
+	VkPipelineStageFlags2 _evalStage(VkShaderStageFlags Shader) const;
 
 public:
 	GVkBarrier(std::shared_ptr<GVkImageView> View, VkImageLayout Layout, VkPipelineStageFlags2 Stage, VkAccessFlags2 Access)
 		: Image(View), layout(Layout), barrierStage(Stage), barrierAccess(Access)
 	{
+		ownershipReleasedFlags.resize(View->GetRoot()->FlightCount());
 	}
 
 	GVkBarrier(std::shared_ptr<GVkBufferView> View, VkPipelineStageFlags2 Stage, VkAccessFlags2 Access)
 		: Buffer(View), barrierStage(Stage), barrierAccess(Access)
 	{
+		ownershipReleasedFlags.resize(View->GetRoot()->FlightCount());
 	}
 
 	GVkBarrier(std::shared_ptr<GVkSwapchain> View, VkImageLayout Layout, VkPipelineStageFlags2 Stage, VkAccessFlags2 Access)
@@ -52,10 +47,21 @@ public:
 	{
 	}
 
-	void GetBufferBarreirs(std::vector<VkBufferMemoryBarrier2>& bufferBarriers) const;
-	void GetImageBarreirs(std::vector<VkImageMemoryBarrier2>& imageBarriers) const;
+	GVkBarrier(std::shared_ptr<GVkImageView> View, uint32_t Src, uint32_t Dst)
+		: Image(View), srcQueue(Src), dstQueue(Dst)
+	{
+		ownershipReleasedFlags.resize(View->GetRoot()->FlightCount());
+	}
 
-	void Bind(VkCommandBuffer cmd);
+	GVkBarrier(std::shared_ptr<GVkBufferView> View, VkPipelineStageFlags2 Stage, VkAccessFlags2 Access, uint32_t Src, uint32_t Dst)
+		: Buffer(View), barrierStage(Stage), barrierAccess(Access), srcQueue(Src), dstQueue(Dst)
+	{
+		ownershipReleasedFlags.resize(View->GetRoot()->FlightCount());
+	}
+
+	void GetBufferBarriers(std::vector<VkBufferMemoryBarrier2>& bufferBarriers, EOwnershipType ownershipType = EOwnershipType::Ignored) const;
+	void GetImageBarriers(std::vector<VkImageMemoryBarrier2>& imageBarriers, EOwnershipType ownershipType = EOwnershipType::Ignored) const;
+	void Bind(VkCommandBuffer cmd, EOwnershipType ownershipType = EOwnershipType::Ignored);
 };
 
 class GVkTransferSrcBarrier : public GVkBarrier

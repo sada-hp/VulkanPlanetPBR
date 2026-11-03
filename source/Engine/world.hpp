@@ -9,12 +9,13 @@
 class IWorld
 {
 private:
+	size_t _drawableRevision = 0;
+
 	std::shared_ptr<GVkBuffer> _transformsPool = VK_NULL_HANDLE;
 	std::shared_ptr<GVkBuffer> _indirectPool = VK_NULL_HANDLE;
 
-private:
-	std::shared_ptr<GVkCommandBuffer> _syncCommandBuffer = VK_NULL_HANDLE;
-	std::shared_ptr<GVkCommandBuffer> _drawCommandBuffer = VK_NULL_HANDLE;
+	std::shared_ptr<GVkBufferView> _transformsPoolView = VK_NULL_HANDLE;
+	std::shared_ptr<GVkBufferView> _indirectPoolView = VK_NULL_HANDLE;
 
 private:
 	std::shared_ptr<GVkDescriptorSet> _transformsSet = VK_NULL_HANDLE;
@@ -39,15 +40,17 @@ public:
 	IWorld(std::shared_ptr<RenderScope> Scope);
 	virtual ~IWorld();
 
-	virtual const glm::vec3& GetSunDirection() const { return sunDirection; }
 	virtual void SetSunDirection(const glm::vec3& newDir) { sunDirection = glm::normalize(newDir); }
+	virtual const glm::vec3& GetSunDirection() const { return sunDirection; }
 
+	size_t GetDrawableRevisionIndex() const { return _drawableRevision; }
 	const entt::registry& GetRegistry() const { return registry; }
+
 	std::shared_ptr<GActor> NewActor();
 
 	std::shared_ptr<GVkDescriptorSet> GetSceneTransformsSet() const;
 	std::shared_ptr<GVkDescriptorSet> GetSceneIndirectSet() const;
 
-	std::shared_ptr<GVkCommandBuffer> GetPrerecordedSyncCommands() const;
-	std::shared_ptr<GVkCommandBuffer> GetPrerecordedDrawCommands(std::shared_ptr<GVkRenderPass> RenderPass, std::shared_ptr<GVkFramebuffer> Framebuffer, std::shared_ptr<GVkDescriptorSet> StaticSet) const;
+	std::shared_ptr<GVkBufferView> GetSceneTransformBuffer() const;
+	std::shared_ptr<GVkBufferView> GetSceneIndirectBuffer() const;
 };

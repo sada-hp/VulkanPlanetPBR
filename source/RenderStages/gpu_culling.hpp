@@ -15,9 +15,13 @@ class GCullingStage : public IRenderStage
 	std::shared_ptr<GVkDescriptorSet> DescriptorSet = VK_NULL_HANDLE;
 	std::shared_ptr<GVkPipeline> Pipeline = VK_NULL_HANDLE;
 
+protected:
+	void setup_dependencies(const IWorld& World) override;
+	void record(const GCamera& Camera, const IWorld& World) override;
+
 public:
 	GCullingStage(std::shared_ptr<RenderScope> Scope);
 	virtual ~GCullingStage();
 
-	void Execute(const GCamera& Camera, const IWorld& World) override;
+	bool IsActive(const IWorld& World) override;
 };

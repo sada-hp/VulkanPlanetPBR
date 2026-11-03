@@ -52,16 +52,13 @@ GVkRenderPass::GVkRenderPass(std::shared_ptr<RenderScope> InScope, VkRenderPassC
 
 			if (!m_imageStates.contains(reference.attachment))
 			{
-				m_imageStates[reference.attachment].initial_layout = reference.layout;
-				m_imageStates[reference.attachment].initial_stage = _pipelineStageFromLayout(reference.layout, false);
-				m_imageStates[reference.attachment].initial_access = _pipelineAccessFromLayout(reference.layout, false);
+				m_imageStates[reference.attachment].initial_layout = attachment.initialLayout;
+				m_imageStates[reference.attachment].initial_stage  = _pipelineStageFromLayout(attachment.initialLayout, false);
+				m_imageStates[reference.attachment].initial_access = _pipelineAccessFromLayout(attachment.initialLayout, false);
 
 				m_imageStates[reference.attachment].next_layout = attachment.finalLayout;
-				m_imageStates[reference.attachment].next_stage = _pipelineStageFromLayout(attachment.finalLayout, false);
+				m_imageStates[reference.attachment].next_stage  = _pipelineStageFromLayout(attachment.finalLayout, false);
 				m_imageStates[reference.attachment].next_access = _pipelineAccessFromLayout(attachment.finalLayout, false);
-
-				// we handle explicit layout transitions in command buffer begin render pass
-				attachment.initialLayout = reference.layout;
 			}
 
 			m_imageStates[reference.attachment].final_layout = reference.layout;
@@ -79,16 +76,13 @@ GVkRenderPass::GVkRenderPass(std::shared_ptr<RenderScope> InScope, VkRenderPassC
 
 			if (!m_imageStates.contains(reference.attachment))
 			{
-				m_imageStates[reference.attachment].initial_layout = reference.layout;
-				m_imageStates[reference.attachment].initial_stage = _pipelineStageFromLayout(reference.layout, false);
-				m_imageStates[reference.attachment].initial_access = _pipelineAccessFromLayout(reference.layout, false);
+				m_imageStates[reference.attachment].initial_layout = attachment.initialLayout;
+				m_imageStates[reference.attachment].initial_stage  = _pipelineStageFromLayout(attachment.initialLayout, false);
+				m_imageStates[reference.attachment].initial_access = _pipelineAccessFromLayout(attachment.initialLayout, false);
 
 				m_imageStates[reference.attachment].next_layout = attachment.finalLayout;
-				m_imageStates[reference.attachment].next_stage = _pipelineStageFromLayout(attachment.finalLayout, false);
+				m_imageStates[reference.attachment].next_stage  = _pipelineStageFromLayout(attachment.finalLayout, false);
 				m_imageStates[reference.attachment].next_access = _pipelineAccessFromLayout(attachment.finalLayout, false);
-
-				// we handle explicit layout transitions in command buffer begin render pass
-				attachment.initialLayout = reference.layout;
 			}
 
 			m_imageStates[reference.attachment].final_layout = reference.layout;
@@ -106,16 +100,13 @@ GVkRenderPass::GVkRenderPass(std::shared_ptr<RenderScope> InScope, VkRenderPassC
 
 			if (!m_imageStates.contains(reference.attachment))
 			{
-				m_imageStates[reference.attachment].initial_layout = reference.layout;
-				m_imageStates[reference.attachment].initial_stage = _pipelineStageFromLayout(reference.layout, false);
-				m_imageStates[reference.attachment].initial_access = _pipelineAccessFromLayout(reference.layout, false);
+				m_imageStates[reference.attachment].initial_layout = attachment.initialLayout;
+				m_imageStates[reference.attachment].initial_stage  = _pipelineStageFromLayout(attachment.initialLayout, false);
+				m_imageStates[reference.attachment].initial_access = _pipelineAccessFromLayout(attachment.initialLayout, false);
 
 				m_imageStates[reference.attachment].next_layout = attachment.finalLayout;
-				m_imageStates[reference.attachment].next_stage = _pipelineStageFromLayout(attachment.finalLayout, false);
+				m_imageStates[reference.attachment].next_stage  = _pipelineStageFromLayout(attachment.finalLayout, false);
 				m_imageStates[reference.attachment].next_access = _pipelineAccessFromLayout(attachment.finalLayout, false);
-
-				// we handle explicit layout transitions in command buffer begin render pass
-				attachment.initialLayout = reference.layout;
 			}
 
 			m_imageStates[reference.attachment].final_layout = reference.layout;

@@ -56,6 +56,14 @@ public:
 	inline const uint32_t& GetResourceIndex() const { return m_ResourceIndex; }
 	VkPhysicalDeviceProperties m_DeviceProperties{};
 
+	inline const VkQueueFlagBits ActualQueueType(VkQueueFlagBits Type) const
+	{
+		if (m_Queues.contains(Type))
+			return Type;
+
+		return VK_QUEUE_GRAPHICS_BIT;
+	}
+
 	inline const Queue& GetQueue(VkQueueFlagBits Type) const
 	{
 		if (m_Queues.contains(Type))

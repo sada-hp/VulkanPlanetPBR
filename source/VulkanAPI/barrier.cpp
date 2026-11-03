@@ -1,13 +1,39 @@
 #include "barrier.hpp"
 
-void GVkBarrier::GetBufferBarreirs(std::vector<VkBufferMemoryBarrier2>& bufferBarriers) const
+VkPipelineStageFlags2 GVkBarrier::_evalStage(VkShaderStageFlags Shader) const
+{
+	switch (Shader)
+	{
+	case VK_SHADER_STAGE_COMPUTE_BIT:
+		return VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+	case VK_SHADER_STAGE_FRAGMENT_BIT:
+		return VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+	case VK_SHADER_STAGE_VERTEX_BIT:
+		return VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT;
+	case VK_SHADER_STAGE_GEOMETRY_BIT:
+		return VK_PIPELINE_STAGE_2_GEOMETRY_SHADER_BIT;
+	default:
+		return VK_PIPELINE_STAGE_2_NONE;
+	}
+}
+
+void GVkBarrier::GetBufferBarriers(std::vector<VkBufferMemoryBarrier2>& bufferBarriers, EOwnershipType ownershipType) const
 {
 	if (Buffer != VK_NULL_HANDLE)
 	{
+		if (ownershipType == EOwnershipType::Acquire && !ownershipReleasedFlags[Buffer->GetRoot()->_activeIndex()])
+			return;
+
+		if (ownershipType == EOwnershipType::Release)
+			ownershipReleasedFlags[Buffer->GetRoot()->_activeIndex()] = true;
+
+		if (ownershipType == EOwnershipType::Acquire)
+			ownershipReleasedFlags[Buffer->GetRoot()->_activeIndex()] = false;
+
 		VkBufferMemoryBarrier2 bufferBarrier{ VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2 };
 
-		bufferBarrier.dstQueueFamilyIndex = dstQueue;
-		bufferBarrier.srcQueueFamilyIndex = srcQueue;
+		bufferBarrier.dstQueueFamilyIndex = ownershipType == EOwnershipType::Ignored ? VK_QUEUE_FAMILY_IGNORED : dstQueue;
+		bufferBarrier.srcQueueFamilyIndex = ownershipType == EOwnershipType::Ignored ? VK_QUEUE_FAMILY_IGNORED : srcQueue;
 
 		bufferBarrier.dstAccessMask = barrierAccess;
 		bufferBarrier.dstStageMask = barrierStage;
@@ -24,14 +50,23 @@ void GVkBarrier::GetBufferBarreirs(std::vector<VkBufferMemoryBarrier2>& bufferBa
 	}
 }
 
-void GVkBarrier::GetImageBarreirs(std::vector<VkImageMemoryBarrier2>& imageBarriers) const
+void GVkBarrier::GetImageBarriers(std::vector<VkImageMemoryBarrier2>& imageBarriers, EOwnershipType ownershipType) const
 {
 	if (Image != VK_NULL_HANDLE)
 	{
+		if (ownershipType == EOwnershipType::Acquire && !ownershipReleasedFlags[Image->GetRoot()->_activeIndex()])
+			return;
+
+		if (ownershipType == EOwnershipType::Release)
+			ownershipReleasedFlags[Image->GetRoot()->_activeIndex()] = true;
+
+		if (ownershipType == EOwnershipType::Acquire)
+			ownershipReleasedFlags[Image->GetRoot()->_activeIndex()] = false;
+
 		VkImageMemoryBarrier2 imageBarrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2 };
 
-		imageBarrier.dstQueueFamilyIndex = dstQueue;
-		imageBarrier.srcQueueFamilyIndex = srcQueue;
+		imageBarrier.dstQueueFamilyIndex = ownershipType == EOwnershipType::Ignored ? VK_QUEUE_FAMILY_IGNORED : dstQueue;
+		imageBarrier.srcQueueFamilyIndex = ownershipType == EOwnershipType::Ignored ? VK_QUEUE_FAMILY_IGNORED : srcQueue;
 
 		imageBarrier.image = Image->GetImage();
 		imageBarrier.newLayout = layout;
@@ -48,6 +83,16 @@ void GVkBarrier::GetImageBarreirs(std::vector<VkImageMemoryBarrier2>& imageBarri
 				imageBarrier.srcAccessMask = Image->_getImageState(Level, Layer).access;
 				imageBarrier.srcStageMask = Image->_getImageState(Level, Layer).stage;
 				imageBarrier.oldLayout = Image->_getImageState(Level, Layer).layout;
+
+				if (barrierAccess == VK_ACCESS_NONE)
+					imageBarrier.dstAccessMask = imageBarrier.srcAccessMask;
+
+				if (barrierStage == VK_PIPELINE_STAGE_FLAG_BITS_MAX_ENUM)
+					imageBarrier.dstStageMask = imageBarrier.srcStageMask;
+
+				if (layout == VK_IMAGE_LAYOUT_UNDEFINED)
+					imageBarrier.newLayout = imageBarrier.oldLayout;
+
 				imageBarrier.subresourceRange.aspectMask = Image->GetSubresource().aspectMask;
 				imageBarrier.subresourceRange.baseArrayLayer = Layer;
 				imageBarrier.subresourceRange.baseMipLevel = Level;
@@ -114,8 +159,8 @@ void GVkBarrier::GetImageBarreirs(std::vector<VkImageMemoryBarrier2>& imageBarri
 	{
 		VkImageMemoryBarrier2 swapchainBarrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2 };
 
-		swapchainBarrier.dstQueueFamilyIndex = dstQueue;
-		swapchainBarrier.srcQueueFamilyIndex = srcQueue;
+		swapchainBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		swapchainBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 
 		swapchainBarrier.image = Swapchain->GetImage();
 		swapchainBarrier.newLayout = layout;
@@ -140,13 +185,13 @@ void GVkBarrier::GetImageBarreirs(std::vector<VkImageMemoryBarrier2>& imageBarri
 	}
 }
 
-void GVkBarrier::Bind(VkCommandBuffer cmd)
+void GVkBarrier::Bind(VkCommandBuffer cmd, EOwnershipType ownershipType)
 {
 	std::vector<VkImageMemoryBarrier2> imageBarriers{};
-	GetImageBarreirs(imageBarriers);
+	GetImageBarriers(imageBarriers, ownershipType);
 
 	std::vector<VkBufferMemoryBarrier2> bufferBarriers{};
-	GetBufferBarreirs(bufferBarriers);
+	GetBufferBarriers(bufferBarriers, ownershipType);
 
 	VkDependencyInfo dependencyInfo{ VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
 	dependencyInfo.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
