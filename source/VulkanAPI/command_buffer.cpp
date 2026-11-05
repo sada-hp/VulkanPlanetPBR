@@ -132,7 +132,7 @@ bool GVkCommandBuffer::IsRecorded() const
 	return false;
 }
 
-bool GVkCommandBuffer::IsRecording()
+bool GVkCommandBuffer::IsRecording() const
 {
 	auto& object = _activeObj();
 	return object.bRecording;
@@ -605,7 +605,9 @@ void GVkCommandBuffer::Execute(std::shared_ptr<GVkCommandBuffer> Commands)
 {
 	auto& object = _updateRecording();
 
-	VkCommandBuffer other = Commands->GetCommandBuffer();
+	VkCommandBuffer other = Commands->_activeObj().cmd;
+	Commands->_activeObj().fence = object.fence;
+
 	vkCmdExecuteCommands(object.cmd, 1, &other);
 	_acquire(Commands);
 }

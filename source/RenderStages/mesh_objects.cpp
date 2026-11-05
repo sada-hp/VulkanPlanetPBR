@@ -13,6 +13,9 @@ void GMeshStage::setup_dependencies(const IWorld& World)
 	auto indirect_view = World.GetSceneIndirectBuffer();
 	Resources.add(indirect_view, EResourceOp::ReadOnly, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_2_CONDITIONAL_RENDERING_BIT_EXT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_2_CONDITIONAL_RENDERING_READ_BIT_EXT);
 
+	auto transform_view = World.GetSceneTransformBuffer();
+	Resources.add(transform_view, EResourceOp::ReadOnly, VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT, VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT);
+
 	auto ubo_view = GVkBuffer::ToView(GVkSharedResources::Instance.UBO);
 	Resources.add(ubo_view, EResourceOp::ReadOnly, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT);
 
@@ -104,7 +107,7 @@ void GMeshStage::_exeuteSecondary(const IWorld& World)
 			Commands.Draw->BeginConditionalRendering(draw._conditionalView);
 			{
 				Commands.Draw->BindVertexBuffer(0, draw.Mesh->VertexBuffer());
-				Commands.Draw->BindVertexBuffer(1, matrix.GetBufferGPU());
+				Commands.Draw->BindVertexBuffer(1, draw._transformView);
 
 				bool IsIndexed = draw.Mesh->IndexCount() > 0;
 

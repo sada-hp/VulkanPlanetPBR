@@ -125,7 +125,7 @@ public:
 	template<typename Type>
 	TransformMatrix& Translate(const glm::vec<3, Type>& V)
 	{
-		return SetOffset(offset + V);
+		return SetOffset(offset + glm::vec<3, TOffset>(V));
 	}
 
 	template<typename Type>

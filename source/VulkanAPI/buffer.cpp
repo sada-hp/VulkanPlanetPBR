@@ -3,6 +3,7 @@
 
 GVkBuffer::GVkBuffer(std::shared_ptr<RenderScope> InScope, size_t Size, EBufferFlags Flags)
 	: Scope(InScope)
+	, m_flags(Flags)
 	, m_size(Size)
 {
 	VkBufferCreateInfo createInfo{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, VK_NULL_HANDLE, 0, Size };
@@ -108,6 +109,11 @@ VkMemoryPropertyFlags GVkBuffer::_memoryFlags() const
 size_t GVkBuffer::GetSize() const
 {
 	return m_size;
+}
+
+EBufferFlags GVkBuffer::GetFlags() const
+{
+	return m_flags;
 }
 
 const VkBuffer& GVkBuffer::GetBuffer() const

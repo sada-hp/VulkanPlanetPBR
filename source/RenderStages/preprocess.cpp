@@ -13,6 +13,9 @@ void GPreprocessStage::setup_dependencies(const IWorld& World)
 
 	auto indirect_view = World.GetSceneIndirectBuffer();
 	Resources.add(indirect_view, EResourceOp::WriteOnly, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT);
+
+	auto transform_view = World.GetSceneTransformBuffer();
+	Resources.add(transform_view, EResourceOp::WriteOnly, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT);
 }
 
 GPreprocessStage::GPreprocessStage(std::shared_ptr<RenderScope> InScope)
@@ -29,15 +32,15 @@ void GPreprocessStage::record(const GCamera& Camera, const IWorld& World)
 	static glm::dmat4 reproj = glm::mat4(1.0);
 
 	glm::dvec3 pos = Camera.GetWorldMatrix().GetPosition();
-	glm::dmat4 view = Camera.ViewMat4();
+	glm::dmat4 view_mat = Camera.ViewMat4();
 	glm::dmat4 world = Camera.WorldMat4();
 	glm::dmat4 proj = Camera.ProjectionMat4();
-	glm::mat4 basis = glm::mat4(glm::mat3(view));
+	glm::mat4 basis = glm::mat4(glm::mat3(view_mat));
 
 	_UniformBuffer UBO{};
-	UBO.view_proj = proj * view;
+	UBO.view_proj = proj * view_mat;
 	UBO.view_proj_no_offset = glm::mat4(proj) * basis;
-	UBO.view_proj_inv = glm::inverse(view) * glm::inverse(proj);
+	UBO.view_proj_inv = glm::inverse(view_mat) * glm::inverse(proj);
 	UBO.reproj = reproj;
 	UBO.sun_dir = glm::vec4(World.GetSunDirection(), 0.0);
 	UBO.eye_pos = glm::vec4(pos, 1.0);
@@ -54,6 +57,17 @@ void GPreprocessStage::record(const GCamera& Camera, const IWorld& World)
 
 	if (updateWorld != VK_NULL_HANDLE)
 		CommandBuffer->Execute(updateWorld);
+
+	auto view = World.GetRegistry().view<EllipsoidMatrix, GDrawable>();
+	for (const auto& [ent, matrix, draw] : view.each())
+	{
+		if (draw._dirtyFlag->IsSet())
+		{
+			DecomposedMatrix decompose = matrix.GetDecompose();
+			CommandBuffer->UpdateBuffer(draw._transformView, (char*)&decompose);
+			draw._dirtyFlag->MarkClear();
+		}
+	}
 
 	reproj = UBO.view_proj;
 }

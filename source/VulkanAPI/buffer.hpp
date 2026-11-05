@@ -3,6 +3,7 @@
 
 enum class EBufferFlags
 {
+	None		= 0,
 	Uniform     = Bit(1),
 	Storage     = Bit(2),
 	Indirect    = Bit(3),
@@ -35,6 +36,7 @@ class GVkBuffer : public IVkObj
 private:
 	std::shared_ptr<RenderScope> Scope = VK_NULL_HANDLE;
 	std::vector<_internalObj> m_flightResources = {};
+	EBufferFlags m_flags = EBufferFlags::None;
 	size_t m_size = 0;
 
 private:
@@ -57,6 +59,7 @@ public:
 	const VkBuffer& At(size_t Index) const { return (*this)[Index]; }
 
 	size_t GetSize() const;
+	EBufferFlags GetFlags() const;
 	const VkBuffer& GetBuffer() const;
 	uint32_t FlightCount() const { return m_flightResources.size(); }
 

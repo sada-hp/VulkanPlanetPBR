@@ -1,5 +1,6 @@
 #pragma once
 #include "resource_cache.hpp"
+#include "Engine/object.hpp"
 #include "queue.hpp"
 #include "core.hpp"
 
@@ -9,7 +10,8 @@
 #include <map>
 
 // dummy obj for interfaces
-class IVkObj {};
+class IVkObj : public GObject
+{};
 
 class RenderScope
 {

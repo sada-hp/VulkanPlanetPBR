@@ -1,12 +1,13 @@
 #pragma once
 #include "Components/drawable.hpp"
+#include "Engine/object.hpp"
 #include "actor.hpp"
 
 #include "entt/entt.hpp"
 #include "glm/glm.hpp"
 #include <vector>
 
-class IWorld
+class IWorld : public GObject
 {
 	friend class GPreprocessStage;
 
@@ -39,6 +40,7 @@ private:
 	void remove_gpu_actor(entt::registry& reg, entt::entity ent);
 	void update_gpu_actor(entt::registry& reg, entt::entity ent);
 	
+private:
 	void update_descriptors();
 
 private:

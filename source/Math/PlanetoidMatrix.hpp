@@ -10,9 +10,6 @@ struct EllipsoidMatrix : public GObject
 	using TOffset = double;
 
 private:
-	std::shared_ptr<GVkBufferView> _gpuBuffer = VK_NULL_HANDLE;
-
-private:
 	const glm::vec<3, TOffset> position_base = glm::vec<3, TOffset>(0.0, GEllipsoid::Rg, 0.0);
 	glm::mat<3, 3, TRotation> orientation_base = glm::mat<3, 3, TRotation>(1.0);
 	glm::mat<4, 4, TOffset> matrix = glm::mat<4, 4, TOffset>(1.0);
@@ -29,13 +26,6 @@ private:
 		matrix = glm::mat<4, 4, TOffset>(orientation_base * local_offset.GetOrientation());
 		matrix[3] = glm::vec<4, TOffset>(p, 1.0);
 
-		if (_gpuBuffer)
-		{
-			DecomposedMatrix decomposed = GetDecompose();
-			memcpy(_gpuBuffer->Map(), &decomposed, sizeof(decomposed));
-			_gpuBuffer->UnMap();
-		}
-
 		invokeChange();
 	}
 
@@ -51,12 +41,6 @@ public:
 
 		local_offset.onChange(this, &EllipsoidMatrix::_update);
 		_update();
-	}
-
-	// temp
-	void AssignBuffer(std::shared_ptr<GVkBufferView> Buffer)
-	{
-		_gpuBuffer = Buffer;
 	}
 
 	LocalMatrix& GetLocalMatrix()
@@ -136,11 +120,6 @@ public:
 	const glm::mat<4, 4, TOffset>& GetMatrix() const
 	{
 		return matrix;
-	}
-
-	std::shared_ptr<GVkBufferView> GetBufferGPU() const
-	{
-		return _gpuBuffer;
 	}
 
 	DecomposedMatrix GetDecompose() const

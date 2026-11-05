@@ -51,14 +51,14 @@ public:
 			connection->clear_connections(this);
 	}
 
-	template<typename T, typename Callback = void(T::*)()>
+	template<typename T, typename Callback = void(T::*)(), typename ...Args>
 	requires std::derived_from<T, GObject>
-	void onChange(T* object, Callback func)
+	void onChange(T* object, Callback func, Args&& ...args)
 	{
 		if (func)
 		{
-			_changeCallbacks[object] = [object, func]() {
-				std::invoke(func, object);
+			_changeCallbacks[object] = [object, func, args...]() {
+				std::invoke(func, object, args...);
 			};
 
 			object->open_connection(this);

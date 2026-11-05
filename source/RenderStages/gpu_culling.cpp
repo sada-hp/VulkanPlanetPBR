@@ -3,7 +3,10 @@
 void GCullingStage::setup_dependencies(const IWorld& World)
 {
 	auto indirect_view = World.GetSceneIndirectBuffer();
-	Resources.add(indirect_view, EResourceOp::WriteOnly, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_WRITE_BIT);
+	Resources.add(indirect_view, EResourceOp::ReadWrite, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_WRITE_BIT);
+
+	auto transform_view = World.GetSceneTransformBuffer();
+	Resources.add(transform_view, EResourceOp::ReadOnly, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT);
 }
 
 GCullingStage::GCullingStage(std::shared_ptr<RenderScope> Scope)

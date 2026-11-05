@@ -72,7 +72,7 @@ public:
 	VkCommandBuffer GetCommandBuffer();
 
 	bool IsRecorded() const;
-	bool IsRecording();
+	bool IsRecording() const;
 
 	void Wait();
 	void Submit(const std::vector<std::shared_ptr<GVkSemaphore>>& waitSemaphores = {}, const std::vector<std::shared_ptr<GVkSemaphore>>& signalSemaphores = {});
