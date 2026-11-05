@@ -1,4 +1,5 @@
 #pragma once
+#include "VulkanAPI/shared_resources.hpp"
 #include "VulkanAPI/command_buffer.hpp"
 #include "Containers/stage_views.hpp"
 #include "Engine/camera.hpp"

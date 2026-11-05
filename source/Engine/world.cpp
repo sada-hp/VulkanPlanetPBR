@@ -15,7 +15,16 @@ IWorld::IWorld(std::shared_ptr<RenderScope> InScope)
 	registry.on_update<GDrawable>().connect<&IWorld::update_gpu_actor>(this);
 
 	_indirectPool = GVkBufferFactory::Buffer(Scope, EBufferFlags::Storage | EBufferFlags::Conditional | EBufferFlags::Indirect | EBufferFlags::InFlight, sizeof(VkDrawIndexedIndirectCommand) * 16192);
+	
+	DescriptorSetDescriptor DSDescIndirect;
+	DSDescIndirect.AddStorageBuffer(VK_SHADER_STAGE_COMPUTE_BIT, GVkBuffer::ToView(_indirectPool));
+	_indirectSet = DSDescIndirect.Allocate(Scope);
+
 	_transformsPool = GVkBufferFactory::Buffer(Scope, EBufferFlags::Storage | EBufferFlags::Host | EBufferFlags::Vertex, sizeof(SMeshData) * 16192);
+
+	DescriptorSetDescriptor DSDescTransform;
+	DSDescTransform.AddStorageBuffer(VK_SHADER_STAGE_COMPUTE_BIT, GVkBuffer::ToView(_transformsPool));
+	_transformsSet = DSDescTransform.Allocate(Scope);
 }
 
 IWorld::~IWorld()
@@ -49,12 +58,20 @@ void IWorld::update_descriptors()
 	if (t_size > _transformsPool->GetSize())
 	{
 		_transformsPool = GVkBufferFactory::Buffer(Scope, EBufferFlags::Storage | EBufferFlags::Host | EBufferFlags::Vertex, t_size);
+
+		DescriptorSetDescriptor DSDescTransform;
+		DSDescTransform.AddStorageBuffer(VK_SHADER_STAGE_COMPUTE_BIT, GVkBuffer::ToView(_transformsPool));
+		_transformsSet = DSDescTransform.Allocate(Scope);
 	}
 
 	size_t c_size = sizeof(VkDrawIndexedIndirectCommand) * objects_count;
 	if (c_size > _indirectPool->GetSize())
 	{
 		_indirectPool = GVkBufferFactory::Buffer(Scope, EBufferFlags::Storage | EBufferFlags::Conditional | EBufferFlags::Indirect | EBufferFlags::InFlight, c_size);
+
+		DescriptorSetDescriptor DSDescIndirect;
+		DSDescIndirect.AddStorageBuffer(VK_SHADER_STAGE_COMPUTE_BIT, GVkBuffer::ToView(_indirectPool));
+		_indirectSet = DSDescIndirect.Allocate(Scope);
 	}
 
 	std::vector<VkDrawIndexedIndirectCommand> drawCommands{};
@@ -79,22 +96,20 @@ void IWorld::update_descriptors()
 	_transformsPoolView = GVkBuffer::ToView(_transformsPool, 0, t_size);
 	_indirectPoolView = GVkBuffer::ToView(_indirectPool, 0, c_size);
 
-	auto updateCommands = std::make_shared<GVkCommandBuffer>(Scope, VK_QUEUE_TRANSFER_BIT);
-	updateCommands->UpdateBuffer(_transformsPoolView, (char*)sceneTransforms.data());
+	if (!drawCommands.empty() && !sceneTransforms.empty())
+	{
+		_updateCommands = std::make_shared<GVkCommandBuffer>(Scope, VK_QUEUE_TRANSFER_BIT, ECmdFlags::InFlight | ECmdFlags::Secondary);
 
-	Scope->ExecuteForAllFrames([this, updateCommands, c_size, drawCommands]() {
-		updateCommands->UpdateBuffer(_indirectPoolView, (char*)drawCommands.data());
-	});
-
-	updateCommands->Submit();
-
-	DescriptorSetDescriptor DSDescIndirect;
-	DSDescIndirect.AddStorageBuffer(VK_SHADER_STAGE_COMPUTE_BIT, GVkBuffer::ToView(_indirectPool, 0, c_size));
-	_indirectSet = DSDescIndirect.Allocate(Scope);
-
-	DescriptorSetDescriptor DSDescTransform;
-	DSDescTransform.AddStorageBuffer(VK_SHADER_STAGE_COMPUTE_BIT, GVkBuffer::ToView(_transformsPool, 0, t_size));
-	_transformsSet = DSDescTransform.Allocate(Scope);
+		Scope->ExecuteForAllFrames([this, sceneTransforms, drawCommands] 
+		{
+			_updateCommands->UpdateBuffer(_transformsPoolView, (char*)sceneTransforms.data());
+			_updateCommands->UpdateBuffer(_indirectPoolView, (char*)drawCommands.data());
+		});
+	}
+	else
+	{
+		_updateCommands = VK_NULL_HANDLE;
+	}
 
 	bDescriptorsDirty = false;
 }
@@ -134,4 +149,21 @@ std::shared_ptr<GVkBufferView> IWorld::GetSceneIndirectBuffer() const
 		const_cast<IWorld*>(this)->update_descriptors();
 
 	return _indirectPoolView;
+}
+
+std::shared_ptr<GVkCommandBuffer> IWorld::GetPreprocessCommands() const
+{
+	if (bDescriptorsDirty)
+		const_cast<IWorld*>(this)->update_descriptors();
+
+	if (_updateCommands == VK_NULL_HANDLE)
+		return VK_NULL_HANDLE;
+
+	// only update once
+	if (_updateCommands->IsRecorded())
+		_updateCommands = VK_NULL_HANDLE;
+	else
+		_updateCommands->Submit();
+
+	return _updateCommands;
 }

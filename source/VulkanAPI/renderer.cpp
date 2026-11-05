@@ -11,6 +11,7 @@
 #include "RenderStages/tonemapping.hpp"
 #include "RenderStages/atmosphere.hpp"
 #include "RenderStages/clear_pass.hpp"
+#include "RenderStages/preprocess.hpp"
 #include "RenderStages/clouds.hpp"
 
 GVulkanBase::GVulkanBase(GLFWwindow* window)
@@ -25,12 +26,13 @@ GVulkanBase::GVulkanBase(GLFWwindow* window)
 	GVkSharedResources::Instance.FinalTarget = GVkImageFactory::FinalRenderTargetFlight(m_Scope, m_Swapchain->GetExtent());
 	GVkSharedResources::Instance.ColorBuffer = GVkImageFactory::ColorRenderTargetFlight(m_Scope, m_Swapchain->GetExtent());
 	GVkSharedResources::Instance.DepthBuffer = GVkImageFactory::DepthRenderTargetFlight(m_Scope, m_Swapchain->GetExtent());
-	GVkSharedResources::Instance.UBO = GVkBufferFactory::Buffer(m_Scope, EBufferFlags::InFlight | EBufferFlags::Mapped | EBufferFlags::Uniform, sizeof(_UniformBuffer));
+	GVkSharedResources::Instance.UBO = GVkBufferFactory::Buffer(m_Scope, EBufferFlags::InFlight | EBufferFlags::Uniform, sizeof(_UniformBuffer));
 
 	// precompute
 	GAtmospherePrecomputeLUT::Execute(m_Scope);
 
 	// render stages
+	AddRenderStage<GPreprocessStage>();
 	AddRenderStage<GCloudsStage>();
 	AddRenderStage<GCullingStage>();
 	AddRenderStage<GMeshStage>();
@@ -45,32 +47,10 @@ GVulkanBase::~GVulkanBase()
 
 bool GVulkanBase::Draw(const GCamera& Camera, const IWorld& World)
 {
-	static glm::dmat4 reproj = glm::mat4(1.0);
-
 	if (m_Swapchain->QueryNextImage())
 	{
 		float Aspect = static_cast<float>(m_Swapchain->GetExtent().width) / static_cast<float>(m_Swapchain->GetExtent().height);
 		const_cast<GCamera&>(Camera).GetProjectionMatrix().SetAspect(Aspect);
-
-		glm::dvec3 pos = Camera.GetWorldMatrix().GetPosition();
-		glm::dmat4 view  = Camera.ViewMat4();
-		glm::dmat4 world = Camera.WorldMat4();
-		glm::dmat4 proj  = Camera.ProjectionMat4();
-		glm::mat4 basis = glm::mat4(glm::mat3(view));
-
-		_UniformBuffer UBO{};
-		UBO.view_proj = proj * view;
-		UBO.view_proj_no_offset = glm::mat4(proj) * basis;
-		UBO.view_proj_inv = glm::inverse(view) * glm::inverse(proj);
-		UBO.reproj = reproj;
-		UBO.sun_dir = glm::vec4(World.GetSunDirection(), 0.0);
-		UBO.eye_pos = glm::vec4(pos, 1.0);
-		UBO.eye_pos_i = glm::ivec4(pos, 0.0);
-		UBO.eye_pos_f = glm::vec4(pos - glm::dvec3(UBO.eye_pos_i), 0.0);
-		UBO.time = glfwGetTime();
-
-		memcpy(GVkSharedResources::Instance.UBO->Map(), &UBO, sizeof(UBO));
-		GVkSharedResources::Instance.UBO->UnMap();
 
 		m_FrameGraph->Draw(Camera, World);
 
@@ -79,8 +59,6 @@ bool GVulkanBase::Draw(const GCamera& Camera, const IWorld& World)
 		m_Swapchain->Present();
 
 		m_Scope->IncrementFlightIndex();
-
-		reproj = UBO.view_proj;
 		return true;
 	}
 

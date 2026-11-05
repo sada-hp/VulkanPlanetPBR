@@ -71,7 +71,7 @@ public:
 	VkQueueFlagBits GetType() const { return m_qFlags; }
 	VkCommandBuffer GetCommandBuffer();
 
-	bool IsRecorded();
+	bool IsRecorded() const;
 	bool IsRecording();
 
 	void Wait();

@@ -97,7 +97,7 @@ ShaderCodeDefinition(GShaders::CloudsCommonPS)
 
 	float GetAbsorbtion()
 	{
-		return mix(0.25, 0.0025, Scattering.a);
+		return mix(0.0025, 0.2, Scattering.a);
 	}
 
 	vec3 GetUV(vec3 pos, float scale)
@@ -144,31 +144,29 @@ ShaderCodeDefinition(GShaders::CloudsCommonPS)
 		return GetAbsorbtion() * saturate(cloud);
 	}
 
-	bool SearchCloud(inout vec3 ray_pos, vec3 end)
+	bool SearchCloud(inout vec3 ray_pos, vec3 end, float max_steps)
 	{
 		const float ray_length = distance(ray_pos, end);
-		const float steps = ceil(mix(32.f, 96.f, saturate(ray_length / (3.0 * BoundDelta))));
+		const float steps = ceil(mix(32.f, max_steps, saturate(ray_length / (3.0 * BoundDelta))));
 
 		float ds = ray_length / steps;
 		const vec3 ray_dir = normalize(end - ray_pos);
 
 		bool found = false;
 		float sample_density = 0.0;
+
 		for (float i = 0; i < steps; i++)
 		{
-			vec3 temp_pos = ray_pos + ray_dir * ds;
-			sample_density = SampleDensity(temp_pos, GetHeight(temp_pos), 0);
+			vec3 old_pos = ray_pos;
+			ray_pos = ray_pos + ray_dir * ds;
+			sample_density = SampleDensity(ray_pos, GetHeight(ray_pos), 0);
 
 			if (sample_density != 0)
 			{
-				if (found)
-					return true;
-
-				ds = ds / steps;
+				ds = ds / (steps - i);
+				ray_pos = old_pos;
 				found = true;
 			}
-			else
-				ray_pos = temp_pos;
 		}
 
 		return found;
@@ -180,13 +178,13 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 	float MultiScatter(float phi, float e)
 	{
 		float luminance = 0.0;
-		float a = 1.0, b = 1.0, c = 1.0;
-		for (int i = 0; i < 5; i++)
+		float a = 1.0, b = 0.625, c = 1.0;
+		for (int i = 1; i <= 5; i++)
 		{
-			luminance += b * HGDPhase(c * phi, c * MieG) * BeerLambert(e * a, 1);
+			luminance += b * HGDPhase(phi, c * MieG) * BeerLambert(e * a, 1);
 			a *= 0.75;
 			c *= 0.25;
-			b *= 0.25;
+			b *= b;
 		}
 
 		return luminance;
@@ -212,10 +210,11 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 		for (int i = 0; i <= 6; i++)
 		{
 			vec3 cone_dir = (dir + kernel[i] * float(i)) * ds;
-			pos += cone_dir;
+			vec3 p = pos + cone_dir;
 
-			cone_density += SampleDensity(pos, GetHeight(pos), mip) * length(cone_dir);
-			ds *= i < 4 ? 1.0 : 2.0;
+			cone_density += SampleDensity(p, GetHeight(p), mip) * length(cone_dir);
+			mip = 0.75 * mip;
+			ds = 1.5 * ds;
 		}
 
 		return GetAbsorbtion() * cone_density;
@@ -243,7 +242,7 @@ ShaderCodeDefinition(GShaders::CloudsPS)
 		const vec3 eye = UBO.eye_pos.xyz;
 		const float Re = length(eye);
 
-		const float ray_length = distance(begin, end);
+		const float ray_length =  min(distance(begin, end), BoundDelta);
 		const float distance_to_ray = distance(eye, begin);
 		const float max_distance = sphere_intersection(vec3(0, Rg, 0), vec3(1, 0, 0), vec3(0.0), BottomBound);
 
@@ -372,7 +371,7 @@ ShaderCodeDefinition(GShaders::CloudsSetupUnderPS)
 		ray_origin = eye + dir * db;
 		ray_end = eye + dir * dt;
 		
-		return dg == Invalid && SearchCloud(ray_origin, ray_end);
+		return dg == Invalid && SearchCloud(ray_origin, ray_end, 96.f);
 	}
 );
 
@@ -388,7 +387,7 @@ ShaderCodeDefinition(GShaders::CloudsSetupBetweenPS)
 		ray_end = eye + dir * mix(dt, db, float(groundVisible));
 		ray_origin = eye;
 
-		return SearchCloud(ray_origin, ray_end);
+		return SearchCloud(ray_origin, ray_end, 256.f);
 	}
 );
 
@@ -407,6 +406,6 @@ ShaderCodeDefinition(GShaders::CloudsSetupAbovePS)
 		ray_end = eye + dir * min(dt_bot, dt_max);
 		ray_origin = eye + dir * dt_min;
 
-		return (dt.x != Invalid || dt.y != Invalid) && SearchCloud(ray_origin, ray_end);
+		return (dt.x != Invalid || dt.y != Invalid) && SearchCloud(ray_origin, ray_end, 96.f);
 	}
 );

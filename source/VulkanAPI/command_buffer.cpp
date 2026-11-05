@@ -52,9 +52,9 @@ GVkCommandBuffer::_internalObj& GVkCommandBuffer::_updateRecording(const VkComma
 
 	if (!object.bRecording)
 	{
-		_reset(object);
-
 		object.fence->Wait();
+
+		_reset(object);
 		object.bRecorded = false;
 		object.bRecording = true;
 
@@ -122,7 +122,7 @@ VkCommandBuffer GVkCommandBuffer::GetCommandBuffer()
 	return object.cmd;
 }
 
-bool GVkCommandBuffer::IsRecorded()
+bool GVkCommandBuffer::IsRecorded() const
 {
 	if (CheckFlag(m_cmdFlags, ECmdFlags::Secondary))
 	{

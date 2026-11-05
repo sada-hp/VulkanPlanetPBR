@@ -59,6 +59,9 @@ void GCloudsStage::setup_dependencies(const IWorld& World)
 {
 	auto color_view = GVkImage::ToView(GVkSharedResources::Instance.ColorBuffer);
 	Resources.add(color_view, EResourceOp::ReadWrite, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT);
+
+	auto ubo_view = GVkBuffer::ToView(GVkSharedResources::Instance.UBO);
+	Resources.add(ubo_view, EResourceOp::ReadOnly, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT);
 }
 
 GCloudsStage::GCloudsStage(std::shared_ptr<RenderScope> Scope)

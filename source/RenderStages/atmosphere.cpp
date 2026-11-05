@@ -5,6 +5,9 @@ void GAtmosphereStage::setup_dependencies(const IWorld& World)
 {
 	auto color_view = GVkImage::ToView(GVkSharedResources::Instance.ColorBuffer);
 	Resources.add(color_view, EResourceOp::ReadWrite, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT);
+
+	auto ubo_view = GVkBuffer::ToView(GVkSharedResources::Instance.UBO);
+	Resources.add(ubo_view, EResourceOp::ReadOnly, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT);
 }
 
 GAtmosphereStage::GAtmosphereStage(std::shared_ptr<RenderScope> Scope)

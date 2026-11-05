@@ -13,6 +13,9 @@ void GMeshStage::setup_dependencies(const IWorld& World)
 	auto indirect_view = World.GetSceneIndirectBuffer();
 	Resources.add(indirect_view, EResourceOp::ReadOnly, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_2_CONDITIONAL_RENDERING_BIT_EXT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_2_CONDITIONAL_RENDERING_READ_BIT_EXT);
 
+	auto ubo_view = GVkBuffer::ToView(GVkSharedResources::Instance.UBO);
+	Resources.add(ubo_view, EResourceOp::ReadOnly, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT);
+
 	Commands.Draw = std::make_shared<GVkCommandBuffer>(Scope, VK_QUEUE_GRAPHICS_BIT, ECmdFlags::InFlight | ECmdFlags::Secondary);
 }
 

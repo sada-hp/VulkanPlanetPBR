@@ -8,6 +8,8 @@
 
 class IWorld
 {
+	friend class GPreprocessStage;
+
 private:
 	size_t _drawableRevision = 0;
 
@@ -20,6 +22,9 @@ private:
 private:
 	std::shared_ptr<GVkDescriptorSet> _transformsSet = VK_NULL_HANDLE;
 	std::shared_ptr<GVkDescriptorSet> _indirectSet = VK_NULL_HANDLE;
+
+private:
+	mutable std::shared_ptr<GVkCommandBuffer> _updateCommands = VK_NULL_HANDLE;
 	mutable bool bDescriptorsDirty = false;
 
 protected:
@@ -35,6 +40,9 @@ private:
 	void update_gpu_actor(entt::registry& reg, entt::entity ent);
 	
 	void update_descriptors();
+
+private:
+	std::shared_ptr<GVkCommandBuffer> GetPreprocessCommands() const;
 
 public:
 	IWorld(std::shared_ptr<RenderScope> Scope);

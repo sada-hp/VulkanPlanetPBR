@@ -1,5 +1,26 @@
 #include "frame_graph.hpp"
 
+bool _stageSupported(VkQueueFlags queue, VkPipelineStageFlags2 stage)
+{
+	if (queue == VK_QUEUE_TRANSFER_BIT)
+	{
+		stage &= ~VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+		stage &= ~VK_PIPELINE_STAGE_2_RESOLVE_BIT;
+		stage &= ~VK_PIPELINE_STAGE_2_COPY_BIT;
+		stage &= ~VK_PIPELINE_STAGE_2_BLIT_BIT;
+	}
+	else if (queue == VK_QUEUE_COMPUTE_BIT)
+	{
+		stage &= ~VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+	}
+	else
+	{
+		stage = 0;
+	}
+
+	return stage == 0;
+}
+
 GFrameGraph::GFrameGraph(std::shared_ptr<RenderScope> InScope)
 	: Scope(InScope)
 {
@@ -24,6 +45,9 @@ void GFrameGraph::_recursive_register(IRenderStage* stage, std::unordered_map<IR
 
 void GFrameGraph::_bind_semaphores(IRenderStage* stage, IRenderStage* next, VkPipelineStageFlags flags)
 {
+	if (!_stageSupported(next->Type, flags))
+		flags = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+
 	std::shared_ptr<GVkSemaphore> semaphore = std::make_shared<GVkSemaphore>(Scope, flags, ESemaphoreFlags::InFlight);
 	_semaphores[stage].signalSemaphores.push_back(semaphore);
 	_semaphores[next].waitSemaphores.push_back(semaphore);
@@ -31,7 +55,16 @@ void GFrameGraph::_bind_semaphores(IRenderStage* stage, IRenderStage* next, VkPi
 
 void GFrameGraph::_bind_barriers(IRenderStage* stage, IRenderStage* next, const GStageViews::buffer_iterator& it)
 {
-	std::shared_ptr<GVkBarrier> barrier = std::make_shared<GVkBarrier>(it->view, it->stage, it->access, Scope->GetQueue(stage->Type).GetFamilyIndex(), Scope->GetQueue(next->Type).GetFamilyIndex());
+	VkPipelineStageFlags2 flags = it->stage;
+	VkAccessFlagBits2 access = it->access;
+
+	if (!_stageSupported(next->Type, flags))
+	{
+		flags = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+		access = VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT;
+	}
+
+	std::shared_ptr<GVkBarrier> barrier = std::make_shared<GVkBarrier>(it->view, flags, access, Scope->GetQueue(stage->Type).GetFamilyIndex(), Scope->GetQueue(next->Type).GetFamilyIndex());
 	_ownershipsOut[stage].push_back(barrier);
 	_ownershipsIn[next].push_back(barrier);
 }
@@ -78,6 +111,7 @@ void GFrameGraph::_sync(std::vector<IRenderStage*>& list)
 		
 		size_t j = (i + 1) % _ordererd.size();
 
+		std::unordered_set<IVkObj*> visited = {};
 		while (i != j)
 		{
 			IRenderStage* next = _ordererd[j];
@@ -87,20 +121,22 @@ void GFrameGraph::_sync(std::vector<IRenderStage*>& list)
 				for (auto it = stage->Resources.image_begin(); it != stage->Resources.image_end(); it++)
 				{
 					auto next_it = next->Resources.find(it->view);
-					if (next->Resources.is_valid(next_it))
+					if (next->Resources.is_valid(next_it) && !visited.contains(it->view.get()))
 					{
 						_bind_semaphores(stage, next, it->stage);
 						_bind_barriers(stage, next, it);
+						visited.insert(it->view.get());
 					}
 				}
 
 				for (auto it = stage->Resources.buffer_begin(); it != stage->Resources.buffer_end(); it++)
 				{
 					auto next_it = next->Resources.find(it->view);
-					if (next->Resources.is_valid(next_it))
+					if (next->Resources.is_valid(next_it) && !visited.contains(it->view.get()))
 					{
 						_bind_semaphores(stage, next, it->stage);
 						_bind_barriers(stage, next, it);
+						visited.insert(it->view.get());
 					}
 				}
 			}
