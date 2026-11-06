@@ -57,3 +57,9 @@ void Queue::submitCommandBuffer(VkCommandBuffer cmd, VkFence fence, const std::v
 
 	vkQueueSubmit(m_vkQueue, 1, &submitInfo, fence);
 }
+
+void Queue::submit(const std::vector<VkSubmitInfo>& submissions, VkFence fence) const
+{
+	if (!submissions.empty())
+		vkQueueSubmit(m_vkQueue, submissions.size(), submissions.data(), fence);
+}

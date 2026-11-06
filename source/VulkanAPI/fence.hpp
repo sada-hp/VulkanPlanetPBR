@@ -36,6 +36,7 @@ public:
 	bool IsInFlight() const { return m_flightResources.size() != 1; }
 	const VkFence& At(size_t Index) const { return (*this)[Index]; }
 
+	void Wait(uint32_t index) const;
 	VkFence GetFence() const;
 	void Wait() const;
 	void Reset();

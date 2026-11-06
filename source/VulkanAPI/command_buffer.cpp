@@ -29,14 +29,19 @@ GVkCommandBuffer::GVkCommandBuffer(std::shared_ptr<RenderScope> InScope, VkQueue
 
 GVkCommandBuffer::~GVkCommandBuffer()
 {
+	uint32_t index = 0;
 	for (auto& object : m_flightResources)
 	{
 		if (object.bRecording)
+		{
+			_end(object);
 			_submitRecording(object, {}, {}, {});
+		}
 
-		object.fence->Wait();
+		object.fence->Wait(index);
 
 		Scope->GetQueue(m_qFlags).freeCommandBuffer(object.cmd);
+		index++;
 	}
 }
 
@@ -80,18 +85,25 @@ GVkCommandBuffer::_internalObj& GVkCommandBuffer::_updateRecording(const VkComma
 
 void GVkCommandBuffer::_submitRecording(_internalObj& object, const std::vector<VkSemaphore>& waitSemaphores, const std::vector<VkPipelineStageFlags>& waitStages, const std::vector<VkSemaphore>& signalSemaphores)
 {
+	if (CheckFlag(m_cmdFlags, ECmdFlags::Secondary))
+		return;
+
+	if (!object.bRecorded)
+		return;
+
+	object.fence->Reset();
+	object.bRecorded = false;
+	Scope->GetQueue(m_qFlags).submitCommandBuffer(object.cmd, object.fence->GetFence(), waitSemaphores, waitStages, signalSemaphores);
+}
+
+void GVkCommandBuffer::_end(_internalObj& object)
+{
 	if (object.bRecording)
 	{
 		if (object.renderPass)
 			EndRenderPass();
 
 		vkEndCommandBuffer(object.cmd);
-
-		if (!CheckFlag(m_cmdFlags, ECmdFlags::Secondary))
-		{
-			object.fence->Reset();
-			Scope->GetQueue(m_qFlags).submitCommandBuffer(object.cmd, object.fence->GetFence(), waitSemaphores, waitStages, signalSemaphores);
-		}
 
 		object.pipeline = VK_NULL_HANDLE;
 		object.bRecording = false;
@@ -140,17 +152,27 @@ bool GVkCommandBuffer::IsRecording() const
 
 void GVkCommandBuffer::Wait()
 {
+	uint32_t index = 0;
 	for (auto& object : m_flightResources)
-		object.fence->Wait();
+	{
+		object.fence->Wait(index);
+		index++;
+	}
+}
+
+void GVkCommandBuffer::EndRecording()
+{
+	auto& object = _activeObj();
+	_end(object);
 }
 
 void GVkCommandBuffer::Submit(const std::vector<std::shared_ptr<GVkSemaphore>>& inWaitSemaphores, const std::vector<std::shared_ptr<GVkSemaphore>>& inSignalSemaphores)
 {
 	auto& object = _activeObj();
+	_end(object);
 
-	std::vector<VkSemaphore> waitSemaphores;
-	std::vector<VkSemaphore> signalSemaphores;
 	std::vector<VkPipelineStageFlags> waitStages;
+	std::vector<VkSemaphore> waitSemaphores, signalSemaphores;
 
 	for (auto& semaphore : inWaitSemaphores)
 	{
@@ -626,4 +648,10 @@ void GVkCommandBuffer::BindBarriers(const std::vector<VkBufferMemoryBarrier2>& b
 
 	auto& object = _updateRecording();
 	vkCmdPipelineBarrier2(object.cmd, &dependencyInfo);
+}
+
+void GVkCommandBuffer::SetFence(std::shared_ptr<GVkFence> fence)
+{
+	for (auto& object : m_flightResources)
+		object.fence = fence;
 }

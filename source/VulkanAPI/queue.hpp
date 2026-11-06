@@ -21,4 +21,5 @@ public:
 	void freeCommandBuffer(VkCommandBuffer cmd) const;
 
 	void submitCommandBuffer(VkCommandBuffer cmd, VkFence fence, const std::vector<VkSemaphore>& waitSemaphores, const std::vector<VkPipelineStageFlags>& waitStages, const std::vector<VkSemaphore>& signalSemaphores) const;
+	void submit(const std::vector<VkSubmitInfo>& submissions, VkFence fence) const;
 };

@@ -28,8 +28,19 @@ GFrameGraph::GFrameGraph(std::shared_ptr<RenderScope> InScope)
 
 GFrameGraph::~GFrameGraph()
 {
+	_clear();
+
 	for (auto& stage : _stages)
 		delete stage;
+}
+
+void GFrameGraph::_clear()
+{
+	_batches.clear();
+	_ordererd.clear();
+	_semaphores.clear();
+	_ownershipsIn.clear();
+	_ownershipsOut.clear();
 }
 
 void GFrameGraph::_recursive_register(IRenderStage* stage, std::unordered_map<IRenderStage*, std::unordered_set<IRenderStage*>>& adjacent_list)
@@ -84,11 +95,6 @@ void GFrameGraph::_bind_barriers(IRenderStage* stage, IRenderStage* next, const 
 
 void GFrameGraph::_sync(std::vector<IRenderStage*>& list)
 {
-	_ordererd.clear();
-	_semaphores.clear();
-	_ownershipsIn.clear();
-	_ownershipsOut.clear();
-
 	if (list.empty())
 		return;
 
@@ -135,6 +141,71 @@ void GFrameGraph::_sync(std::vector<IRenderStage*>& list)
 			j = (j + 1) % _ordererd.size();
 		}
 	}
+
+	std::vector<IRenderStage*> batches{};
+	VkQueueFlagBits lastQueue = VK_QUEUE_FLAG_BITS_MAX_ENUM;
+	std::shared_ptr<GVkFence> batchFence = std::make_shared<GVkFence>(Scope, EFenceFlags::CreateSignaled | EFenceFlags::InFlight);
+
+	for (auto& stage : _ordererd)
+	{
+		if (lastQueue != stage->Type && !batches.empty())
+		{
+			_batches.emplace_back(lastQueue, batchFence, std::move(batches));
+
+			batchFence = std::make_shared<GVkFence>(Scope, EFenceFlags::CreateSignaled | EFenceFlags::InFlight);
+			batches.clear();
+		}
+
+		stage->CommandBuffer->SetFence(batchFence);
+		batches.push_back(stage);
+		lastQueue = stage->Type;
+	}
+
+	if (!batches.empty())
+		_batches.emplace_back(lastQueue, batchFence, std::move(batches));
+}
+
+void GFrameGraph::_submit_batch(const recording_batch& batch)
+{
+	std::vector<submit_descriptor> submitDescriptors(batch.stages.size());
+	std::vector<VkSubmitInfo> submitInfos(batch.stages.size());
+
+	uint32_t index = 0;
+	for (auto& stage : batch.stages)
+	{
+		submitDescriptors[index].cmd = stage->CommandBuffer->GetCommandBuffer();
+
+		for (auto& semaphore : _semaphores[stage].waitSemaphores)
+		{
+			if (auto sem = semaphore->GetWaitSemaphore())
+			{
+				submitDescriptors[index].waitStages.push_back(semaphore->GetPipelineStage());
+				submitDescriptors[index].waitSemaphores.push_back(sem);
+			}
+		}
+
+		for (auto& semaphore : _semaphores[stage].signalSemaphores)
+		{
+			if (auto sem = semaphore->GetSignalSemaphore())
+				submitDescriptors[index].signalSemaphores.push_back(sem);
+		}
+
+		submitInfos[index].commandBufferCount = 1;
+		submitInfos[index].pCommandBuffers = &submitDescriptors[index].cmd;
+
+		submitInfos[index].signalSemaphoreCount = submitDescriptors[index].signalSemaphores.size();
+		submitInfos[index].pSignalSemaphores = submitDescriptors[index].signalSemaphores.data();
+
+		submitInfos[index].waitSemaphoreCount = submitDescriptors[index].waitSemaphores.size();
+		submitInfos[index].pWaitSemaphores = submitDescriptors[index].waitSemaphores.data();
+		submitInfos[index].pWaitDstStageMask = submitDescriptors[index].waitStages.data();
+
+		submitInfos[index].sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		index++;
+	}
+
+	batch.fence->Reset();
+	Scope->GetQueue(batch.queueFlags).submit(submitInfos, batch.fence->GetFence());
 }
 
 void GFrameGraph::Draw(const GCamera& Camera, const IWorld& World)
@@ -163,17 +234,25 @@ void GFrameGraph::Draw(const GCamera& Camera, const IWorld& World)
 
 	if (new_flags != _flags)
 	{
-		_sync(_activeStages);
+		_clear();
 		_flags = new_flags;
+
+		_sync(_activeStages);
 	}
 
-
-	for (auto& stage : _ordererd)
+	for (auto& batch : _batches)
 	{
-		stage->_acquire_resources(_ownershipsIn[stage]);
+		batch.fence->Wait();
 
-		stage->record(Camera, World);
+		for (auto& stage : batch.stages)
+		{
+			stage->_bind_acquire_barriers(_ownershipsIn[stage]);
 
-		stage->_submit(_ownershipsOut[stage], _semaphores[stage].waitSemaphores, _semaphores[stage].signalSemaphores);
+			stage->record(Camera, World);
+
+			stage->_bind_release_barriers(_ownershipsOut[stage]);
+		}
+
+		_submit_batch(batch);
 	}
 }

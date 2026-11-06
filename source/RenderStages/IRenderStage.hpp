@@ -19,7 +19,7 @@ protected:
 	VkQueueFlagBits Type;
 
 private:
-	void _acquire_resources(const std::vector<std::shared_ptr<GVkBarrier>>& ownership)
+	void _bind_acquire_barriers(const std::vector<std::shared_ptr<GVkBarrier>>& ownership)
 	{
 		std::vector<VkImageMemoryBarrier2> images;
 		images.reserve(Resources.images_size() * 2);
@@ -52,7 +52,7 @@ private:
 		CommandBuffer->BindBarriers(buffers, images);
 	}
 
-	void _submit(const std::vector<std::shared_ptr<GVkBarrier>>& ownership, const std::vector<std::shared_ptr<GVkSemaphore>>& waitSemaphores, const std::vector<std::shared_ptr<GVkSemaphore>>& signalSemaphores)
+	void _bind_release_barriers(const std::vector<std::shared_ptr<GVkBarrier>>& ownership)
 	{
 		assert(CommandBuffer->IsRecording());
 
@@ -73,7 +73,7 @@ private:
 			CommandBuffer->BindBarriers(buffers, images);
 		}
 
-		CommandBuffer->Submit(waitSemaphores, signalSemaphores);
+		CommandBuffer->EndRecording();
 	}
 
 	bool _dependsOn(const IRenderStage& other)

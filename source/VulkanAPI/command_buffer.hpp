@@ -58,6 +58,7 @@ private:
 private:
 	void _submitRecording(_internalObj& object, const std::vector<VkSemaphore>& waitSemaphores, const std::vector<VkPipelineStageFlags>& waitStages, const std::vector<VkSemaphore>& signalSemaphores);
 	void _reset(_internalObj& object);
+	void _end(_internalObj& object);
 	
 	void _acquire(std::shared_ptr<IVkObj> obj);
 
@@ -75,6 +76,8 @@ public:
 	bool IsRecording() const;
 
 	void Wait();
+	void EndRecording();
+
 	void Submit(const std::vector<std::shared_ptr<GVkSemaphore>>& waitSemaphores = {}, const std::vector<std::shared_ptr<GVkSemaphore>>& signalSemaphores = {});
 
 	void BlitImage(std::shared_ptr<GVkImageView> Image, std::shared_ptr<GVkSwapchain> Swapchain);
@@ -117,6 +120,8 @@ public:
 
 	void Execute(std::shared_ptr<GVkCommandBuffer> Commands);
 	void Reset();
+
+	void SetFence(std::shared_ptr<GVkFence> fence);
 
 public:
 	template<std::derived_from<GVkBarrier> BarrierType, typename T, typename ...Args>

@@ -34,6 +34,14 @@ VkFence GVkFence::GetFence() const
 	return object.fence;
 }
 
+void GVkFence::Wait(uint32_t index) const
+{
+	VkFence fence = At(index);
+
+	if (vkGetFenceStatus(Scope->GetDevice(), fence) != VK_SUCCESS)
+		vkWaitForFences(Scope->GetDevice(), 1, &fence, VK_TRUE, UINT64_MAX);
+}
+
 void GVkFence::Wait() const
 {
 	auto& object = _activeObj();
