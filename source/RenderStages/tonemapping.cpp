@@ -7,7 +7,7 @@ void GTonemapStage::setup_dependencies(const IWorld& World)
 	Resources.add(color_view, EResourceOp::ReadOnly, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT);
 
 	auto final_view = GVkImage::ToView(GVkSharedResources::Instance.FinalTarget);
-	Resources.add(final_view, EResourceOp::WriteOnly, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT);
+	Resources.add(final_view, EResourceOp::WriteOnly, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT);
 }
 
 GTonemapStage::GTonemapStage(std::shared_ptr<RenderScope> InScope)

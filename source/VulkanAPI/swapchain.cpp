@@ -22,7 +22,7 @@ void GVkSwapchain::_clear()
 {
 	m_acquireFence = VK_NULL_HANDLE;
 
-	for (auto& [image, view, state] : m_swapchainResources)
+	for (auto& [image, view, state, sem] : m_swapchainResources)
 		vkDestroyImageView(Scope->GetDevice(), view, VK_NULL_HANDLE);
 
 	if (m_Swapchain)
@@ -158,6 +158,8 @@ const VkImageView& GVkSwapchain::GetImageView() const
 
 const GVkSwapchainState& GVkSwapchain::GetImageState() const
 {
+	_wait();
+
 	auto& object = _activeObj();
 	return object.state;
 }
@@ -195,13 +197,27 @@ bool GVkSwapchain::QueryNextImage()
 	return m_Swapchain != VK_NULL_HANDLE;
 }
 
-void GVkSwapchain::Present()
+void GVkSwapchain::Present(std::shared_ptr<GVkSemaphore> waitSemaphore)
 {
 	_wait();
+
+	auto& object = _activeObj();
+	object.acquired_semaphore = waitSemaphore;
+
+	VkSemaphore semaphore = VK_NULL_HANDLE;
 
 	VkPresentInfoKHR presentInfo{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
 	presentInfo.pImageIndices = &m_SwapchainIndex;
 	presentInfo.pSwapchains = &m_Swapchain;
 	presentInfo.swapchainCount = 1;
+
+	if (waitSemaphore != VK_NULL_HANDLE)
+	{
+		semaphore = waitSemaphore->GetWaitSemaphore();
+
+		presentInfo.waitSemaphoreCount = semaphore != VK_NULL_HANDLE;
+		presentInfo.pWaitSemaphores = &semaphore;
+	}
+
 	vkQueuePresentKHR(Scope->GetQueue(VK_QUEUE_GRAPHICS_BIT).GetQueue(), &presentInfo);
 }

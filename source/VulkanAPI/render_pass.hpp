@@ -44,36 +44,86 @@ public:
 	uint32_t GetSubpassCount() const { return m_subpassCount; }
 };
 
-struct GVkSubpassDescription
+struct SubpassDescription
 {
-	std::vector<uint32_t> colorAttachmentsIndices = {};
-	std::vector<uint32_t> inputAttachmentsIndices = {};
+public:
+	std::set<uint32_t> colorAttachmentsIndices = {};
+	std::set<uint32_t> inputAttachmentsIndices = {};
 	uint32_t depthAttachmentIndex = VK_ATTACHMENT_UNUSED;
 };
 
 class RenderPassDescriptor
 {
-	struct GVkSubpass
+	struct GSubpass
 	{
 		std::vector<VkAttachmentReference> colorReferences = {};
 		std::vector<VkAttachmentReference> inputReferences = {};
 		VkAttachmentReference depthReference = { VK_ATTACHMENT_UNUSED };
-		uint32_t Index = VK_SUBPASS_EXTERNAL;
+
+		std::vector<uint32_t> attachments() const
+		{
+			std::vector<uint32_t> out{};
+
+			for (auto& ref : colorReferences)
+				out.push_back(ref.attachment);
+
+			for (auto& ref : inputReferences)
+				out.push_back(ref.attachment);
+
+			if (depthReference.attachment != VK_ATTACHMENT_UNUSED)
+				out.push_back(depthReference.attachment);
+
+			return out;
+		}
+
+		bool contains(uint32_t attachement, VkPipelineStageFlags2& outStageFlags, VkAccessFlags2& outAccessFlags) const
+		{
+			outStageFlags = 0; outAccessFlags = 0;
+
+			for (auto& ref : colorReferences)
+			{
+				if (attachement == ref.attachment)
+				{
+					outAccessFlags |= VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT;
+					outStageFlags |= VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+					break;
+				}
+			}
+
+			for (auto& ref : inputReferences)
+			{
+				if (attachement == ref.attachment)
+				{
+					outStageFlags |= VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+					outAccessFlags |= VK_ACCESS_2_INPUT_ATTACHMENT_READ_BIT;
+					break;
+				}
+			}
+
+			if (depthReference.attachment == attachement)
+			{
+				outAccessFlags |= VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+				outStageFlags |= VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+			}
+
+			return outStageFlags != 0;
+		}
 	};
 
 	std::vector<VkAttachmentDescription> m_attachmentDescriptions = {};
 	std::vector<VkClearValue> m_clearValues = {};
-	std::vector<GVkSubpass> m_subpasses = {};
+	std::vector<GSubpass> m_subpasses = {};
 
 private:
-	std::pair<VkPipelineStageFlags, VkAccessFlags> find_ref(const GVkSubpass& subpass, uint32_t index);
+	std::vector<VkSubpassDescription> buildSubpassDescriptions();
+	std::vector<VkSubpassDependency> buildSubpassDependencies();
 
 public:
-	uint32_t AddAttachmentLoadOp(VkFormat Format, VkImageLayout InitialLayout, VkImageLayout FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VkSampleCountFlagBits Samples = VK_SAMPLE_COUNT_1_BIT);
 	uint32_t AddAttachmentDontCareOp(VkFormat Format, VkImageLayout FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VkSampleCountFlagBits Samples = VK_SAMPLE_COUNT_1_BIT);
-	uint32_t AddAttachmentClearOp(VkFormat Format, VkClearValue ClearValue = {}, VkImageLayout FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VkSampleCountFlagBits Samples = VK_SAMPLE_COUNT_1_BIT);
+	uint32_t AddAttachmentLoadOp(VkFormat Format, VkImageLayout InitialLayout, VkImageLayout FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VkSampleCountFlagBits Samples = VK_SAMPLE_COUNT_1_BIT);
+	uint32_t AddAttachmentClearOp(VkFormat Format, VkClearValue ClearValue = VkClearValue{}, VkImageLayout FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VkSampleCountFlagBits Samples = VK_SAMPLE_COUNT_1_BIT);
 	
-	RenderPassDescriptor& AddSubpass(const GVkSubpassDescription& Subpass);
+	RenderPassDescriptor& AddSubpass(const SubpassDescription& Subpass);
 
 	std::shared_ptr<GVkRenderPass> Construct(std::shared_ptr<RenderScope> Scope);
 };

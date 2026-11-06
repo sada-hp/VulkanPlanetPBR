@@ -11,7 +11,10 @@
 
 // dummy obj for interfaces
 class IVkObj : public GObject
-{};
+{
+public:
+	virtual ~IVkObj() { }
+};
 
 class RenderScope
 {

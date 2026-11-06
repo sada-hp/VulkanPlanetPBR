@@ -2,6 +2,7 @@
 #include "VulkanAPI/barrier.hpp"
 #include "VulkanAPI/buffer.hpp"
 #include "VulkanAPI/image.hpp"
+#include <iterator>
 
 enum class EResourceOp
 {
@@ -12,30 +13,122 @@ enum class EResourceOp
 
 class GStageViews
 {
+	friend class resource_iterator;
+
 public:
-	struct image_resource
+	struct stage_resource
 	{
+	public:
+		VkPipelineStageFlagBits2 stage;
+		VkAccessFlagBits2 access;
+		EResourceOp Op;
+
+	public:
+		virtual ~stage_resource() {}
+		virtual IVkObj* ptr() const = 0;
+		virtual bool is_texture() const = 0;
+		virtual bool compare(const stage_resource& other) const { return false; }
+	};
+
+	struct resource_iterator : public std::forward_iterator_tag
+	{
+		friend class GStageViews;
+
+	private:
+		GStageViews* _array;
+		size_t _index;
+
+	private:
+		resource_iterator(GStageViews* a, size_t i)
+			: _array(a)
+			, _index(i)
+		{ }
+
+		resource_iterator(const GStageViews* a, size_t i)
+			: _array(const_cast<GStageViews*>(a))
+			, _index(i)
+		{ }
+
+	public:
+		stage_resource& operator*() 
+		{ 
+			if (_index < _array->_images.size())
+				return _array->_images[_index];
+			
+			return _array->_buffers[_index - _array->_images.size()]; 
+		}
+
+		const stage_resource& operator*() const
+		{
+			if (_index < _array->_images.size())
+				return _array->_images[_index];
+
+			return _array->_buffers[_index - _array->_images.size()];
+		}
+
+		stage_resource* operator->() { return &this->operator*(); }
+
+		friend bool operator== (const resource_iterator& a, const resource_iterator& b) { return a._array == b._array && a._index == b._index; };
+		friend bool operator!= (const resource_iterator& a, const resource_iterator& b) { return a._array != b._array || a._index != b._index; };
+
+		resource_iterator operator++(int) { auto tmp = *this; ++(*this); return tmp; }
+		resource_iterator& operator++() { _index++; return *this; }
+	};
+
+	struct image_resource : public stage_resource
+	{
+	public:
 		std::shared_ptr<GVkImageView> view;
-		VkPipelineStageFlagBits2 stage;
-		VkAccessFlagBits2 access;
 		VkImageLayout layout;
-		EResourceOp Op;
+
+	public:
+		virtual ~image_resource() {}
+
+		IVkObj* ptr() const override
+		{
+			return view.get();
+		}
+
+		bool is_texture() const override
+		{
+			return true;
+		}
+
+		bool compare(const stage_resource& other) const override
+		{
+			if (other.is_texture())
+				return *static_cast<const image_resource&>(other).view == *view;
+
+			return false; 
+		}
 	};
 
-	struct buffer_resource
+	struct buffer_resource : public stage_resource
 	{
+	public:
 		std::shared_ptr<GVkBufferView> view;
-		VkPipelineStageFlagBits2 stage;
-		VkAccessFlagBits2 access;
-		EResourceOp Op;
+
+	public:
+		virtual ~buffer_resource() {}
+
+		IVkObj* ptr() const override
+		{
+			return view.get();
+		}
+
+		bool is_texture() const override
+		{
+			return false;
+		}
+
+		bool compare(const stage_resource& other) const override
+		{
+			if (!other.is_texture())
+				return *static_cast<const buffer_resource&>(other).view == *view;
+
+			return false;
+		}
 	};
-
-public:
-	using image_iterator = std::vector<image_resource>::iterator;
-	using buffer_iterator = std::vector<buffer_resource>::iterator;
-
-	using image_const_iterator = std::vector<image_resource>::const_iterator;
-	using buffer_const_iterator = std::vector<buffer_resource>::const_iterator;
 
 private:
 	std::vector<buffer_resource> _buffers;
@@ -83,7 +176,15 @@ public:
 	void add(std::shared_ptr<GVkBufferView> view, EResourceOp Op, VkPipelineStageFlagBits2 stage, VkAccessFlagBits2 access)
 	{
 		if (!_merge_buffer(view, Op, stage, access))
-			_buffers.emplace_back(view, stage, access, Op);
+		{
+			buffer_resource res{};
+			res.access = access;
+			res.stage = stage;
+			res.view = view;
+			res.Op = Op;
+
+			_buffers.emplace_back(std::move(res));
+		}
 	}
 
 	void add(std::shared_ptr<GVkImageView> view, EResourceOp Op, VkImageLayout layout, VkPipelineStageFlagBits2 stage, VkAccessFlagBits2 access)
@@ -95,7 +196,16 @@ public:
 				auto newview = GVkImage::ToView(view->GetRoot(), level, layer, 1, 1, view->GetType());
 
 				if (!_merge_image(newview, Op, stage, access))
-					_images.emplace_back(newview, stage, access, layout, Op);
+				{
+					image_resource res{};
+					res.layout = layout;
+					res.access = access;
+					res.stage = stage;
+					res.view = view;
+					res.Op = Op;
+
+					_images.emplace_back(std::move(res));
+				}
 			}
 		}
 	}
@@ -110,106 +220,15 @@ public:
 		return _buffers.size();
 	}
 
+	size_t size() const
+	{
+		return images_size() + buffers_size();
+	}
+
 	void clear()
 	{
 		_buffers.clear();
 		_images.clear();
-	}
-
-	buffer_iterator buffer_begin()
-	{
-		return _buffers.begin();
-	}
-
-	buffer_iterator buffer_end()
-	{
-		return _buffers.end();
-	}
-
-	image_iterator image_begin()
-	{
-		return _images.begin();
-	}
-
-	image_iterator image_end()
-	{
-		return _images.end();
-	}
-
-	buffer_const_iterator buffer_cbegin() const
-	{
-		return _buffers.begin();
-	}
-
-	buffer_const_iterator buffer_cend() const
-	{
-		return _buffers.end();
-	}
-
-	image_const_iterator image_cbegin() const
-	{
-		return _images.begin();
-	}
-
-	image_const_iterator image_cend() const
-	{
-		return _images.end();
-	}
-
-	template<typename T>
-	std::vector<T>::iterator begin()
-	{
-		return {};
-	}
-
-	template<>
-	std::vector<image_resource>::iterator begin<image_resource>()
-	{
-		return image_begin();
-	}
-
-	template<>
-	std::vector<buffer_resource>::iterator begin<buffer_resource>()
-	{
-		return buffer_begin();
-	}
-
-	template<typename T>
-	std::vector<T>::iterator end()
-	{
-		return {};
-	}
-
-	template<>
-	std::vector<image_resource>::iterator end<image_resource>()
-	{
-		return image_end();
-	}
-
-	template<>
-	std::vector<buffer_resource>::iterator end<buffer_resource>()
-	{
-		return buffer_end();
-	}
-
-	bool is_valid(image_iterator& it) const
-	{
-		return it != _images.end();
-	}
-
-	bool is_valid(image_const_iterator& it) const
-	{
-		return it != _images.cend();
-	}
-
-	bool is_valid(buffer_iterator& it) const
-	{
-		return it != _buffers.end();
-	}
-
-	bool is_valid(buffer_const_iterator& it) const
-	{
-		return it != _buffers.cend();
 	}
 
 	bool empty() const
@@ -217,69 +236,44 @@ public:
 		return _images.empty() && _buffers.empty();
 	}
 
-	bool contains(std::shared_ptr<GVkImageView> view) const
+	resource_iterator buffer_begin() const
 	{
-		for (auto& image : _images)
-		{
-			if (*view == *image.view)
-				return true;
-		}
-
-		return false;
+		return resource_iterator(this, images_size());
 	}
 
-	bool contains(std::shared_ptr<GVkBufferView> view) const
+	resource_iterator buffer_end() const
 	{
-		for (auto& buffer : _buffers)
-		{
-			if (*view == *buffer.view)
-				return true;
-		}
-
-		return false;
+		return resource_iterator(this, size());
 	}
 
-	image_iterator find(std::shared_ptr<GVkImageView> view)
+	resource_iterator image_begin() const
 	{
-		for (auto it = _images.begin(); it != _images.end(); it++)
+		return resource_iterator(this, 0);
+	}
+
+	resource_iterator image_end() const
+	{
+		return buffer_begin();
+	}
+
+	resource_iterator begin() const
+	{
+		return resource_iterator(this, 0);
+	}
+
+	resource_iterator end() const
+	{
+		return resource_iterator(this, _images.size() + _buffers.size());
+	}
+
+	resource_iterator find_similar(const stage_resource& resource) const
+	{
+		for (auto it = begin(); it != end(); it++)
 		{
-			if (*view == *it->view)
+			if (it->compare(resource))
 				return it;
 		}
 
-		return _images.end();
-	}
-
-	buffer_iterator find(std::shared_ptr<GVkBufferView> view)
-	{
-		for (auto it = _buffers.begin(); it != _buffers.end(); it++)
-		{
-			if (*view == *it->view)
-				return it;
-		}
-
-		return _buffers.end();
-	}
-
-	image_const_iterator find(std::shared_ptr<GVkImageView> view) const
-	{
-		for (auto it = _images.cbegin(); it != _images.cend(); it++)
-		{
-			if (*view == *it->view)
-				return it;
-		}
-
-		return _images.cend();
-	}
-
-	buffer_const_iterator find(std::shared_ptr<GVkBufferView> view) const
-	{
-		for (auto it = _buffers.cbegin(); it != _buffers.cend(); it++)
-		{
-			if (*view == *it->view)
-				return it;
-		}
-
-		return _buffers.cend();
+		return end();
 	}
 };

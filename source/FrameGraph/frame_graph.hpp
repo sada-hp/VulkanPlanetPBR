@@ -28,9 +28,8 @@ protected:
 private:
 	void _recursive_register(IRenderStage* stage, std::unordered_map<IRenderStage*, std::unordered_set<IRenderStage*>>& adjacent_list);
 	
-	void _bind_semaphores(IRenderStage* stage, IRenderStage* next, VkPipelineStageFlags flags);
-	void _bind_barriers(IRenderStage* stage, IRenderStage* next, const GStageViews::image_iterator& it);
-	void _bind_barriers(IRenderStage* stage, IRenderStage* next, const GStageViews::buffer_iterator& it);
+	void _bind_semaphores(IRenderStage* stage, IRenderStage* next, const GStageViews::stage_resource& resource);
+	void _bind_barriers(IRenderStage* stage, IRenderStage* next, const GStageViews::stage_resource& resource);
 
 	void _sync(std::vector<IRenderStage*>& list);
 

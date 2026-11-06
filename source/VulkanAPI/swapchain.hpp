@@ -1,4 +1,5 @@
 #pragma once
+#include "semaphore.hpp"
 #include "fence.hpp"
 #include "scope.hpp"
 
@@ -16,6 +17,7 @@ class GVkSwapchain : public IVkObj
 		VkImage image = VK_NULL_HANDLE;
 		VkImageView view = VK_NULL_HANDLE;
 		GVkSwapchainState state = {};
+		std::shared_ptr<GVkSemaphore> acquired_semaphore = VK_NULL_HANDLE;
 	};
 
 private:
@@ -51,6 +53,6 @@ public:
 	const VkImage& GetImage() const;
 
 	void SetImageState(VkImageLayout Layout, VkPipelineStageFlags Stage, VkAccessFlags Access);
+	void Present(std::shared_ptr<GVkSemaphore> waitSemaphore);
 	bool QueryNextImage();
-	void Present();
 };

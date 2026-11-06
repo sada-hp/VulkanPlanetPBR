@@ -55,8 +55,8 @@ public:
 		/* 3 */ RPDesc.AddAttachmentLoadOp(RenderScope::GetColorFormat(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 		/* 4 */ RPDesc.AddAttachmentLoadOp(RenderScope::GetDepthFormat(), VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
-		RPDesc.AddSubpass(GVkSubpassDescription{ .colorAttachmentsIndices = {0, 1, 2}, .depthAttachmentIndex = 4 });
-		RPDesc.AddSubpass(GVkSubpassDescription{ .colorAttachmentsIndices = {3}, .inputAttachmentsIndices = {0,1,2} });
+		RPDesc.AddSubpass(SubpassDescription{ .colorAttachmentsIndices = {0, 1, 2}, .depthAttachmentIndex = 4 });
+		RPDesc.AddSubpass(SubpassDescription{ .colorAttachmentsIndices = {3}, .inputAttachmentsIndices = {0,1,2} });
 
 		return RPDesc.Construct(Scope);
 	}

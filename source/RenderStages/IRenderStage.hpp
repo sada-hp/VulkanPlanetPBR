@@ -35,14 +35,18 @@ private:
 
 		for (auto it = Resources.image_begin(); it != Resources.image_end(); it++)
 		{
-			GVkBarrier barrier(it->view, it->layout, it->stage, it->access);
+			auto image = static_cast<GStageViews::image_resource&>(*it);
+
+			GVkBarrier barrier(image.view, image.layout, image.stage, image.access);
 			barrier.GetImageBarriers(images);
 		}
 
 		for (auto it = Resources.buffer_begin(); it != Resources.buffer_end(); it++)
 		{
-			GVkBarrier barrier(it->view, it->stage, it->access);
-			barrier.GetImageBarriers(images);
+			auto buffer = static_cast<GStageViews::buffer_resource&>(*it);
+
+			GVkBarrier barrier(buffer.view, buffer.stage, buffer.access);
+			barrier.GetBufferBarriers(buffers);
 		}
 
 		CommandBuffer->BindBarriers(buffers, images);
@@ -74,20 +78,12 @@ private:
 
 	bool _dependsOn(const IRenderStage& other)
 	{
-		for (auto it = Resources.image_cbegin(); it != Resources.image_cend(); it++)
+		for (auto& resource : Resources)
 		{
-			auto oit = other.Resources.find(it->view);
+			auto it = other.Resources.find_similar(resource);
 
-			if (oit != other.Resources.image_cend())
-				return static_cast<int>(oit->Op) < static_cast<int>(it->Op);
-		}
-
-		for (auto it = Resources.buffer_cbegin(); it != Resources.buffer_cend(); it++)
-		{
-			auto oit = other.Resources.find(it->view);
-
-			if (oit != other.Resources.buffer_cend())
-				return static_cast<int>(oit->Op) < static_cast<int>(it->Op);
+			if (it != other.Resources.end())
+				return static_cast<int>(it->Op) < static_cast<int>(resource.Op);
 		}
 
 		return false;

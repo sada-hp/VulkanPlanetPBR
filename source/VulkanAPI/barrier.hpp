@@ -47,8 +47,8 @@ public:
 	{
 	}
 
-	GVkBarrier(std::shared_ptr<GVkImageView> View, uint32_t Src, uint32_t Dst)
-		: Image(View), srcQueue(Src), dstQueue(Dst)
+	GVkBarrier(std::shared_ptr<GVkImageView> View, VkPipelineStageFlags2 Stage, VkAccessFlags2 Access, uint32_t Src, uint32_t Dst)
+		: Image(View), barrierStage(Stage), barrierAccess(Access), srcQueue(Src), dstQueue(Dst)
 	{
 		ownershipReleasedFlags.resize(View->GetRoot()->FlightCount());
 	}
@@ -98,8 +98,8 @@ public:
 	GVkRenderTargetBarrier(std::shared_ptr<GVkImageView> View)
 		: GVkBarrier(View
 			, View->GetRoot()->IsDepth() ? VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-			, View->GetRoot()->IsDepth() ? VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT  : VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT
-			, View->GetRoot()->IsDepth() ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT : VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)
+			, View->GetRoot()->IsDepth() ? VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT  : VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT
+			, View->GetRoot()->IsDepth() ? VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT : VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT)
 	{ }
 };
 
@@ -131,6 +131,6 @@ class GVkPresentBarrier : public GVkBarrier
 {
 public:
 	GVkPresentBarrier(std::shared_ptr<GVkSwapchain> View)
-		: GVkBarrier(View, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT)
+		: GVkBarrier(View, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_PIPELINE_STAGE_2_NONE, VK_ACCESS_2_NONE)
 	{ }
 };

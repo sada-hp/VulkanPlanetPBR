@@ -40,7 +40,7 @@ void GVkBarrier::GetBufferBarriers(std::vector<VkBufferMemoryBarrier2>& bufferBa
 
 		bufferBarrier.buffer = Buffer->GetBuffer();
 		bufferBarrier.offset = Buffer->GetOffset();
-		bufferBarrier.size = Buffer->GetSize();
+		bufferBarrier.size = Buffer->GetSize() == Buffer->GetRoot()->GetSize() - Buffer->GetOffset() ? VK_WHOLE_SIZE : Buffer->GetSize();
 
 		// ? TODO
 		bufferBarrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT;

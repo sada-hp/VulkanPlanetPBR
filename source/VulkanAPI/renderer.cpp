@@ -20,6 +20,7 @@ GVulkanBase::GVulkanBase(GLFWwindow* window)
 	m_FrameGraph = std::make_shared<GFrameGraph>(m_Scope);
 
 	m_Swapchain = std::make_shared<GVkSwapchain>(m_Scope, window);
+	m_PresentSemaphore = std::make_shared<GVkSemaphore>(m_Scope, VK_PIPELINE_STAGE_TRANSFER_BIT, ESemaphoreFlags::InFlight);
 	m_BlitCommandBuffer = std::make_shared<GVkCommandBuffer>(m_Scope, VK_QUEUE_GRAPHICS_BIT, ECmdFlags::InFlight);
 	m_DrawCommandBuffer = std::make_shared<GVkCommandBuffer>(m_Scope, VK_QUEUE_GRAPHICS_BIT, ECmdFlags::InFlight);
 
@@ -55,8 +56,8 @@ bool GVulkanBase::Draw(const GCamera& Camera, const IWorld& World)
 		m_FrameGraph->Draw(Camera, World);
 
 		m_BlitCommandBuffer->BlitImage(GVkImage::ToView(GVkSharedResources::Instance.FinalTarget), m_Swapchain);
-		m_BlitCommandBuffer->Submit();
-		m_Swapchain->Present();
+		m_BlitCommandBuffer->Submit({}, { m_PresentSemaphore });
+		m_Swapchain->Present(m_PresentSemaphore);
 
 		m_Scope->IncrementFlightIndex();
 		return true;

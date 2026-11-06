@@ -192,6 +192,7 @@ void GVkCommandBuffer::UpdateBuffer(std::shared_ptr<GVkBufferView> Buffer, char*
 	else if (Buffer->GetSize() < 65536 && Buffer->GetOffset() % 4 == 0 && Buffer->GetSize() % 4 == 0)
 	{
 		auto& object = _updateRecording();
+		BindBarrier<GVkTransferDstBarrier>(Buffer);
 		vkCmdUpdateBuffer(object.cmd, Buffer->GetBuffer(), Buffer->GetOffset(), Buffer->GetSize(), Data);
 	}
 	else

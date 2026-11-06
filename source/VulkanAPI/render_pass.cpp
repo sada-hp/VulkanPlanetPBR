@@ -35,6 +35,15 @@ static VkAccessFlags _pipelineAccessFromLayout(VkImageLayout layout, bool Src)
 	return accessTable.contains(layout) ? accessTable.at(layout) : VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
 }
 
+static bool _isDepthFormat(VkFormat format)
+{
+	return format == VK_FORMAT_D32_SFLOAT
+		|| format == VK_FORMAT_D32_SFLOAT_S8_UINT
+		|| format == VK_FORMAT_D24_UNORM_S8_UINT
+		|| format == VK_FORMAT_D16_UNORM_S8_UINT
+		|| format == VK_FORMAT_D16_UNORM;
+}
+
 GVkRenderPass::GVkRenderPass(std::shared_ptr<RenderScope> InScope, VkRenderPassCreateInfo CreateInfo, const std::vector<VkClearValue>& ClearValues)
 	: Scope(InScope)
 	, m_clearValues(ClearValues)
@@ -184,9 +193,9 @@ uint32_t RenderPassDescriptor::AddAttachmentClearOp(VkFormat Format, VkClearValu
 	return m_attachmentDescriptions.size() - 1;
 }
 
-RenderPassDescriptor& RenderPassDescriptor::AddSubpass(const GVkSubpassDescription& SubpassDescription)
+RenderPassDescriptor& RenderPassDescriptor::AddSubpass(const SubpassDescription& SubpassDescription)
 {
-	GVkSubpass Subpass;
+	GSubpass Subpass;
 	for (auto& colorIndex : SubpassDescription.colorAttachmentsIndices)
 		Subpass.colorReferences.emplace_back(colorIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
@@ -194,65 +203,102 @@ RenderPassDescriptor& RenderPassDescriptor::AddSubpass(const GVkSubpassDescripti
 		Subpass.inputReferences.emplace_back(inputIndex, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 	Subpass.depthReference = VkAttachmentReference{ SubpassDescription.depthAttachmentIndex, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
-	Subpass.Index = m_subpasses.size();
 
-	m_subpasses.push_back(Subpass);
+	m_subpasses.push_back(std::move(Subpass));
 	return *this;
 }
 
-std::pair<VkPipelineStageFlags, VkAccessFlags> RenderPassDescriptor::find_ref(const GVkSubpass& subpass, uint32_t index)
+std::vector<VkSubpassDependency> RenderPassDescriptor::buildSubpassDependencies()
 {
-	auto colorRef = std::find_if(subpass.colorReferences.begin(), subpass.colorReferences.end(), [index](const VkAttachmentReference& ref)
+	std::vector<VkSubpassDependency> dependencies(m_subpasses.size() + 1, VkSubpassDependency{});
+
+	// build indices
+	for (uint32_t i = 0; i < dependencies.size(); i++)
 	{
-		return ref.attachment == index;
-	});
+		dependencies[i].srcSubpass = VK_SUBPASS_EXTERNAL;
+		dependencies[i].dstSubpass = VK_SUBPASS_EXTERNAL;
+		dependencies[i].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
-	if (colorRef != subpass.colorReferences.end())
-		return std::pair{ _pipelineStageFromLayout(colorRef->layout, true), _pipelineAccessFromLayout(colorRef->layout, true) };
+		if (i != dependencies.size() - 1)
+			dependencies[i].dstSubpass = i;
 
-	auto inputRef = std::find_if(subpass.inputReferences.begin(), subpass.inputReferences.end(), [index](const VkAttachmentReference& ref)
-	{
-		return ref.attachment == index;
-	});
-
-	if (inputRef != subpass.inputReferences.end())
-		return std::pair{ _pipelineStageFromLayout(inputRef->layout, true), _pipelineAccessFromLayout(inputRef->layout, true) };
-
-	if (index == subpass.depthReference.attachment)
-		return std::pair{ _pipelineStageFromLayout(subpass.depthReference.layout, true), _pipelineAccessFromLayout(subpass.depthReference.layout, true) };
-
-	return std::pair{ 0, 0 };
-}
-
-std::shared_ptr<GVkRenderPass> RenderPassDescriptor::Construct(std::shared_ptr<RenderScope> Scope)
-{
-	if (m_subpasses.empty())
-	{
-		GVkSubpassDescription SubpassDS;
-
-		uint32_t index = 0;
-		for (auto& attachment : m_attachmentDescriptions)
-		{
-			if (attachment.format == VK_FORMAT_D24_UNORM_S8_UINT
-			|| attachment.format == VK_FORMAT_D32_SFLOAT_S8_UINT
-			|| attachment.format == VK_FORMAT_D16_UNORM_S8_UINT
-			|| attachment.format == VK_FORMAT_D32_SFLOAT
-			|| attachment.format == VK_FORMAT_D16_UNORM)
-			{
-				SubpassDS.depthAttachmentIndex = index;
-			}
-			else
-			{
-				SubpassDS.colorAttachmentsIndices.push_back(index);
-			}
-
-			index++;
-		}
-
-		AddSubpass(SubpassDS);
+		if (i != 0)
+			dependencies[i].srcSubpass = i - 1;
 	}
 
+	// build dst stages
+	for (uint32_t i = 0; i < m_subpasses.size(); i++)
+	{
+		const auto& subpass = m_subpasses[i];
+
+		if (!subpass.colorReferences.empty())
+		{
+			dependencies[i].dstAccessMask |= VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT;
+			dependencies[i].dstStageMask |= VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+		}
+
+		if (!subpass.inputReferences.empty())
+		{
+			dependencies[i].dstStageMask |= VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+			dependencies[i].dstAccessMask |= VK_ACCESS_2_INPUT_ATTACHMENT_READ_BIT;
+		}
+
+		if (subpass.depthReference.attachment != VK_ATTACHMENT_UNUSED)
+		{
+			dependencies[i].dstAccessMask |= VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+			dependencies[i].dstStageMask |= VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+		}
+	}
+
+	// build subpass src stages
+	for (uint32_t i = 0; i < m_subpasses.size(); i++)
+	{
+		const auto& subpass = m_subpasses[i];
+		
+		if (i == 0)
+		{
+			dependencies[i + 1].srcAccessMask = dependencies[0].dstAccessMask;
+			dependencies[i + 1].srcStageMask = dependencies[0].dstStageMask;
+		}
+		else
+		{
+			for (auto& attachement : subpass.attachments())
+			{
+				// find previous use for attachment
+				for (uint32_t j = i - 1; j < m_subpasses.size(); j++)
+				{
+					const auto& previous = m_subpasses[j];
+
+					VkPipelineStageFlags2 srcStage; VkAccessFlags2 srcAccess;
+					if (previous.contains(attachement, srcStage, srcAccess))
+					{
+						dependencies[i + 1].srcAccessMask |= srcAccess;
+						dependencies[i + 1].srcStageMask |= srcStage;
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	// external sync
+	dependencies.front().srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+	dependencies.back().dstStageMask = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
+
+	for (uint32_t i = 0; i < dependencies.size() - 1; i++)
+	{
+		dependencies.back().srcAccessMask |= dependencies[i].dstAccessMask;
+		dependencies.back().srcStageMask |= dependencies[i].dstStageMask;
+	}
+
+	return dependencies;
+}
+
+std::vector<VkSubpassDescription> RenderPassDescriptor::buildSubpassDescriptions()
+{
 	std::vector<VkSubpassDescription> subpassDescriptions;
+	subpassDescriptions.reserve(m_subpasses.size());
+
 	for (auto& Subpass : m_subpasses)
 	{
 		VkSubpassDescription subpassDescription{};
@@ -265,135 +311,31 @@ std::shared_ptr<GVkRenderPass> RenderPassDescriptor::Construct(std::shared_ptr<R
 		subpassDescriptions.push_back(subpassDescription);
 	}
 
-	std::vector<VkSubpassDependency> subpassDependencies;
+	return subpassDescriptions;
+}
 
-	GVkSubpass& firstSubpass = m_subpasses.front();
-	VkSubpassDependency firstExternalDependency{};
-	firstExternalDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-	firstExternalDependency.dstSubpass = firstSubpass.Index;
-	firstExternalDependency.dependencyFlags = 0;
-
-	for (auto& ref : firstSubpass.colorReferences)
+std::shared_ptr<GVkRenderPass> RenderPassDescriptor::Construct(std::shared_ptr<RenderScope> Scope)
+{
+	if (m_subpasses.empty())
 	{
-		auto& attachment = m_attachmentDescriptions[ref.attachment];
+		SubpassDescription SubpassDS;
 
-		if (attachment.initialLayout != VK_IMAGE_LAYOUT_UNDEFINED)
+		uint32_t index = 0;
+		for (auto& attachment : m_attachmentDescriptions)
 		{
-			firstExternalDependency.dstStageMask |= _pipelineStageFromLayout(attachment.initialLayout, false);
-			firstExternalDependency.dstAccessMask |= _pipelineAccessFromLayout(attachment.initialLayout, false);
+			if (_isDepthFormat(attachment.format))
+				SubpassDS.depthAttachmentIndex = index;
+			else
+				SubpassDS.colorAttachmentsIndices.insert(index);
+
+			index++;
 		}
-		else
-		{
-			firstExternalDependency.dstStageMask |= _pipelineStageFromLayout(ref.layout, false);
-			firstExternalDependency.dstAccessMask |= _pipelineAccessFromLayout(ref.layout, false);
-		}
+
+		AddSubpass(SubpassDS);
 	}
 
-	for (auto& ref : firstSubpass.inputReferences)
-	{
-		auto& attachment = m_attachmentDescriptions[ref.attachment];
-
-		if (attachment.initialLayout != VK_IMAGE_LAYOUT_UNDEFINED)
-		{
-			firstExternalDependency.dstStageMask |= _pipelineStageFromLayout(attachment.initialLayout, false);
-			firstExternalDependency.dstAccessMask |= _pipelineAccessFromLayout(attachment.initialLayout, false);
-		}
-		else
-		{
-			firstExternalDependency.dstStageMask |= _pipelineStageFromLayout(ref.layout, false);
-			firstExternalDependency.dstAccessMask |= _pipelineAccessFromLayout(ref.layout, false);
-		}
-	}
-
-	if (firstSubpass.depthReference.attachment != VK_ATTACHMENT_UNUSED)
-	{
-		auto& attachment = m_attachmentDescriptions[firstSubpass.depthReference.attachment];
-
-		if (attachment.initialLayout != VK_IMAGE_LAYOUT_UNDEFINED)
-		{
-			firstExternalDependency.dstStageMask |= _pipelineStageFromLayout(attachment.initialLayout, false);
-			firstExternalDependency.dstAccessMask |= _pipelineAccessFromLayout(attachment.initialLayout, false);
-		}
-		else
-		{
-			firstExternalDependency.dstStageMask |= _pipelineStageFromLayout(firstSubpass.depthReference.layout, false);
-			firstExternalDependency.dstAccessMask |= _pipelineAccessFromLayout(firstSubpass.depthReference.layout, false);
-		}
-	}
-
-	subpassDependencies.push_back(firstExternalDependency);
-
-	for (uint32_t i = 1; i < m_subpasses.size(); i++)
-	{
-		auto& PrevSubpass = m_subpasses[i - 1];
-		auto& Subpass = m_subpasses[i];
-
-		VkSubpassDependency subpassDependency{};
-		subpassDependency.srcSubpass = PrevSubpass.Index;
-		subpassDependency.dstSubpass = Subpass.Index;
-		subpassDependency.dependencyFlags = 0;
-
-		for (auto& ref : firstSubpass.colorReferences)
-		{
-			auto pair = find_ref(PrevSubpass, ref.attachment);
-			subpassDependency.srcStageMask |= pair.first;
-			subpassDependency.srcAccessMask |= pair.second;
-
-			subpassDependency.dstStageMask |= _pipelineStageFromLayout(ref.layout, false);
-			subpassDependency.dstAccessMask |= _pipelineAccessFromLayout(ref.layout, false);
-		}
-
-		for (auto& ref : firstSubpass.inputReferences)
-		{
-			auto pair = find_ref(PrevSubpass, ref.attachment);
-			subpassDependency.srcStageMask |= pair.first;
-			subpassDependency.srcAccessMask |= pair.second;
-
-			subpassDependency.dstStageMask |= _pipelineStageFromLayout(ref.layout, false);
-			subpassDependency.dstAccessMask |= _pipelineAccessFromLayout(ref.layout, false);
-		}
-
-		if (firstSubpass.depthReference.attachment != VK_ATTACHMENT_UNUSED)
-		{
-			auto pair = find_ref(PrevSubpass, firstSubpass.depthReference.attachment);
-			subpassDependency.srcStageMask |= pair.first;
-			subpassDependency.srcAccessMask |= pair.second;
-
-			subpassDependency.dstStageMask |= _pipelineStageFromLayout(firstSubpass.depthReference.layout, false);
-			subpassDependency.dstAccessMask |= _pipelineAccessFromLayout(firstSubpass.depthReference.layout, false);
-		}
-
-		subpassDependencies.push_back(subpassDependency);
-	}
-
-	GVkSubpass& lastSubpass = m_subpasses.back();
-	VkSubpassDependency lastExternalDependency{};
-	lastExternalDependency.dstSubpass = VK_SUBPASS_EXTERNAL;
-	lastExternalDependency.srcSubpass = lastSubpass.Index;
-	lastExternalDependency.dependencyFlags = 0;
-
-	for (auto& ref : lastSubpass.colorReferences)
-	{
-		auto& attachment = m_attachmentDescriptions[ref.attachment];
-		lastExternalDependency.srcStageMask |= _pipelineStageFromLayout(ref.layout, true);
-		lastExternalDependency.srcAccessMask |= _pipelineAccessFromLayout(ref.layout, true);
-	}
-
-	for (auto& ref : lastSubpass.inputReferences)
-	{
-		auto& attachment = m_attachmentDescriptions[ref.attachment];
-		lastExternalDependency.srcStageMask |= _pipelineStageFromLayout(ref.layout, true);
-		lastExternalDependency.srcAccessMask |= _pipelineAccessFromLayout(ref.layout, true);
-	}
-
-	if (lastSubpass.depthReference.attachment != VK_ATTACHMENT_UNUSED)
-	{
-		auto& attachment = m_attachmentDescriptions[lastSubpass.depthReference.attachment];
-		lastExternalDependency.srcStageMask |= _pipelineStageFromLayout(lastSubpass.depthReference.layout, true);
-		lastExternalDependency.srcAccessMask |= _pipelineAccessFromLayout(lastSubpass.depthReference.layout, true);
-	}
-
-	subpassDependencies.push_back(lastExternalDependency);
+	std::vector<VkSubpassDescription> subpassDescriptions = buildSubpassDescriptions();
+	std::vector<VkSubpassDependency> subpassDependencies  = buildSubpassDependencies();
 
 	VkRenderPassCreateInfo renderPassCreateInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
 	renderPassCreateInfo.attachmentCount = m_attachmentDescriptions.size();
