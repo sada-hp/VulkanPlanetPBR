@@ -6,8 +6,8 @@
 struct GVkSwapchainState
 {
 	VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
-	VkPipelineStageFlags stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-	VkAccessFlags access = VK_ACCESS_NONE;
+	VkPipelineStageFlags2 stage = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
+	VkAccessFlags2 access = VK_ACCESS_2_NONE;
 };
 
 class GVkSwapchain : public IVkObj
@@ -17,7 +17,7 @@ class GVkSwapchain : public IVkObj
 		VkImage image = VK_NULL_HANDLE;
 		VkImageView view = VK_NULL_HANDLE;
 		GVkSwapchainState state = {};
-		std::shared_ptr<GVkSemaphore> acquired_semaphore = VK_NULL_HANDLE;
+		std::shared_ptr<GVkSemaphore> waitSemaphore = VK_NULL_HANDLE;
 	};
 
 private:
@@ -28,7 +28,7 @@ private:
 	VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
 	VkExtent2D m_Extents;
 
-	std::shared_ptr<GVkFence> m_acquireFence = VK_NULL_HANDLE;
+	std::shared_ptr<GVkSemaphore> m_acquireSemaphore = VK_NULL_HANDLE;
 	uint32_t m_SwapchainIndex = 0;
 
 private:
@@ -38,21 +38,20 @@ private:
 private:
 	void _createSurface(struct GLFWwindow* window);
 	void _createSwapchain();
-	void _createFence();
 	void _clear();
-
-	void _wait() const;
 
 public:
 	GVkSwapchain(const std::shared_ptr<RenderScope>& Scope, struct GLFWwindow* window);
 	~GVkSwapchain();
 
+	std::shared_ptr<GVkSemaphore> GetAcquireSemaphore() const;
 	const GVkSwapchainState& GetImageState() const;
 	const VkImageView& GetImageView() const;
 	const VkExtent2D& GetExtent() const;
 	const VkImage& GetImage() const;
 
 	void SetImageState(VkImageLayout Layout, VkPipelineStageFlags Stage, VkAccessFlags Access);
+
 	void Present(std::shared_ptr<GVkSemaphore> waitSemaphore);
-	bool QueryNextImage();
+	bool QueryNextImage(std::shared_ptr<GVkFence> WaitFence);
 };

@@ -380,6 +380,12 @@ void GVkCommandBuffer::BlitImage(std::shared_ptr<GVkImageView> Source, std::shar
 	_acquire(Source);
 }
 
+std::shared_ptr<GVkFence> GVkCommandBuffer::GetFence() const
+{
+	auto& object = _activeObj();
+	return object.fence;
+}
+
 void GVkCommandBuffer::BeginRenderPass(std::shared_ptr<GVkRenderPass> RenderPass, std::shared_ptr<GVkFramebuffer> Framebuffer, VkSubpassContents Contents)
 {
 	if (RenderPass && Framebuffer)
@@ -407,7 +413,7 @@ void GVkCommandBuffer::BeginRenderPass(std::shared_ptr<GVkRenderPass> RenderPass
 				auto attState = object.renderPass->_getAttachmentState(index);
 
 				if (attState.initial_layout != VK_IMAGE_LAYOUT_UNDEFINED && view->_getImageState(view->BaseLevel(), view->BaseLayer()).layout != attState.initial_layout)
-					BindBarrier<GVkBarrier>(view, attState.next_layout, attState.next_stage, attState.next_access);
+					BindBarrier<GVkBarrier>(view, attState.initial_layout, attState.initial_stage, attState.initial_access);
 
 				index++;
 			}

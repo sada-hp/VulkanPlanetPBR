@@ -17,8 +17,8 @@
 enum class ECmdFlags
 {
 	Default  = 0,
-	InFlight  = Bit(0),
-	Secondary = Bit(1)
+	InFlight   = Bit(0),
+	Secondary  = Bit(1)
 };
 
 DefineFlags(ECmdFlags)
@@ -122,6 +122,7 @@ public:
 	void Reset();
 
 	void SetFence(std::shared_ptr<GVkFence> fence);
+	std::shared_ptr<GVkFence> GetFence() const;
 
 public:
 	template<std::derived_from<GVkBarrier> BarrierType, typename T, typename ...Args>

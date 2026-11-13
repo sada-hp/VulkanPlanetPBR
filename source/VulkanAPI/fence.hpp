@@ -30,7 +30,7 @@ public:
 	inline const VkFence& operator[](size_t index) const { return m_flightResources.at(index % m_flightResources.size()).fence; }
 
 public:
-	GVkFence(std::shared_ptr<RenderScope> Scope, EFenceFlags Flags);
+	GVkFence(std::shared_ptr<RenderScope> Scope, EFenceFlags Flags = EFenceFlags::None);
 	virtual ~GVkFence();
 
 	bool IsInFlight() const { return m_flightResources.size() != 1; }

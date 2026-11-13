@@ -1,7 +1,7 @@
 #include "render_pass.hpp"
 #include "image.hpp"
 
-static VkPipelineStageFlags _pipelineStageFromLayout(VkImageLayout layout, bool Src)
+static VkPipelineStageFlags _pipelineStageFromLayout(VkImageLayout layout)
 {
 	const std::unordered_map<VkImageLayout, VkPipelineStageFlags> stageTable = {
 		{VK_IMAGE_LAYOUT_UNDEFINED, 0},
@@ -10,19 +10,19 @@ static VkPipelineStageFlags _pipelineStageFromLayout(VkImageLayout layout, bool 
 		{VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT},
 		{VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT},
 		{VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT},
-		{VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, Src ? VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT : VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT},
-		{VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, Src ? VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT : VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT},
+		{VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT},
+		{VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT},
 		{VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT}
 	};
 
 	return stageTable.contains(layout) ? stageTable.at(layout) : VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
 }
 
-static VkAccessFlags _pipelineAccessFromLayout(VkImageLayout layout, bool Src)
+static VkAccessFlags _pipelineAccessFromLayout(VkImageLayout layout)
 {
 	const std::unordered_map<VkImageLayout, VkAccessFlags> accessTable = {
 		{VK_IMAGE_LAYOUT_UNDEFINED, 0},
-		{VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_WRITE_BIT },
+		{VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT },
 		{VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT},
 		{VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT},
 		{VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_ACCESS_TRANSFER_READ_BIT},
@@ -32,7 +32,7 @@ static VkAccessFlags _pipelineAccessFromLayout(VkImageLayout layout, bool Src)
 		{VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT}
 	};
 
-	return accessTable.contains(layout) ? accessTable.at(layout) : VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+	return accessTable.contains(layout) ? accessTable.at(layout) : VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT;
 }
 
 static bool _isDepthFormat(VkFormat format)
@@ -44,7 +44,7 @@ static bool _isDepthFormat(VkFormat format)
 		|| format == VK_FORMAT_D16_UNORM;
 }
 
-GVkRenderPass::GVkRenderPass(std::shared_ptr<RenderScope> InScope, VkRenderPassCreateInfo CreateInfo, const std::vector<VkClearValue>& ClearValues)
+GVkRenderPass::GVkRenderPass(std::shared_ptr<RenderScope> InScope, VkRenderPassCreateInfo2 CreateInfo, const std::vector<VkClearValue>& ClearValues)
 	: Scope(InScope)
 	, m_clearValues(ClearValues)
 	, m_subpassCount(CreateInfo.subpassCount)
@@ -57,22 +57,22 @@ GVkRenderPass::GVkRenderPass(std::shared_ptr<RenderScope> InScope, VkRenderPassC
 		for (uint32_t j = 0; j < subpass.colorAttachmentCount; j++)
 		{
 			auto& reference = subpass.pColorAttachments[j];
-			auto& attachment = const_cast<VkAttachmentDescription&>(CreateInfo.pAttachments[reference.attachment]);
+			auto& attachment = const_cast<VkAttachmentDescription2&>(CreateInfo.pAttachments[reference.attachment]);
 
 			if (!m_imageStates.contains(reference.attachment))
 			{
 				m_imageStates[reference.attachment].initial_layout = attachment.initialLayout;
-				m_imageStates[reference.attachment].initial_stage  = _pipelineStageFromLayout(attachment.initialLayout, false);
-				m_imageStates[reference.attachment].initial_access = _pipelineAccessFromLayout(attachment.initialLayout, false);
+				m_imageStates[reference.attachment].initial_stage  = _pipelineStageFromLayout(attachment.initialLayout);
+				m_imageStates[reference.attachment].initial_access = _pipelineAccessFromLayout(attachment.initialLayout);
 
 				m_imageStates[reference.attachment].next_layout = attachment.finalLayout;
-				m_imageStates[reference.attachment].next_stage  = _pipelineStageFromLayout(attachment.finalLayout, false);
-				m_imageStates[reference.attachment].next_access = _pipelineAccessFromLayout(attachment.finalLayout, false);
+				m_imageStates[reference.attachment].next_stage  = _pipelineStageFromLayout(attachment.finalLayout);
+				m_imageStates[reference.attachment].next_access = _pipelineAccessFromLayout(attachment.finalLayout);
 			}
 
 			m_imageStates[reference.attachment].final_layout = reference.layout;
-			m_imageStates[reference.attachment].final_stage = _pipelineStageFromLayout(reference.layout, true);
-			m_imageStates[reference.attachment].final_access = _pipelineAccessFromLayout(reference.layout, true);
+			m_imageStates[reference.attachment].final_stage = _pipelineStageFromLayout(reference.layout);
+			m_imageStates[reference.attachment].final_access = _pipelineAccessFromLayout(reference.layout);
 
 			// we handle explicit layout transitions in command buffer end render pass
 			attachment.finalLayout = reference.layout;
@@ -81,22 +81,22 @@ GVkRenderPass::GVkRenderPass(std::shared_ptr<RenderScope> InScope, VkRenderPassC
 		for (uint32_t j = 0; j < subpass.inputAttachmentCount; j++)
 		{
 			auto& reference = subpass.pInputAttachments[j];
-			auto& attachment = const_cast<VkAttachmentDescription&>(CreateInfo.pAttachments[reference.attachment]);
+			auto& attachment = const_cast<VkAttachmentDescription2&>(CreateInfo.pAttachments[reference.attachment]);
 
 			if (!m_imageStates.contains(reference.attachment))
 			{
 				m_imageStates[reference.attachment].initial_layout = attachment.initialLayout;
-				m_imageStates[reference.attachment].initial_stage  = _pipelineStageFromLayout(attachment.initialLayout, false);
-				m_imageStates[reference.attachment].initial_access = _pipelineAccessFromLayout(attachment.initialLayout, false);
+				m_imageStates[reference.attachment].initial_stage  = _pipelineStageFromLayout(attachment.initialLayout);
+				m_imageStates[reference.attachment].initial_access = _pipelineAccessFromLayout(attachment.initialLayout);
 
 				m_imageStates[reference.attachment].next_layout = attachment.finalLayout;
-				m_imageStates[reference.attachment].next_stage  = _pipelineStageFromLayout(attachment.finalLayout, false);
-				m_imageStates[reference.attachment].next_access = _pipelineAccessFromLayout(attachment.finalLayout, false);
+				m_imageStates[reference.attachment].next_stage  = _pipelineStageFromLayout(attachment.finalLayout);
+				m_imageStates[reference.attachment].next_access = _pipelineAccessFromLayout(attachment.finalLayout);
 			}
 
 			m_imageStates[reference.attachment].final_layout = reference.layout;
-			m_imageStates[reference.attachment].final_stage = _pipelineStageFromLayout(reference.layout, true);
-			m_imageStates[reference.attachment].final_access = _pipelineAccessFromLayout(reference.layout, true);
+			m_imageStates[reference.attachment].final_stage = _pipelineStageFromLayout(reference.layout);
+			m_imageStates[reference.attachment].final_access = _pipelineAccessFromLayout(reference.layout);
 
 			// we handle explicit layout transitions in command buffer end render pass
 			attachment.finalLayout = reference.layout;
@@ -105,29 +105,29 @@ GVkRenderPass::GVkRenderPass(std::shared_ptr<RenderScope> InScope, VkRenderPassC
 		if (subpass.pDepthStencilAttachment && subpass.pDepthStencilAttachment->attachment != VK_ATTACHMENT_UNUSED)
 		{
 			auto& reference = *subpass.pDepthStencilAttachment;
-			auto& attachment = const_cast<VkAttachmentDescription&>(CreateInfo.pAttachments[reference.attachment]);
+			auto& attachment = const_cast<VkAttachmentDescription2&>(CreateInfo.pAttachments[reference.attachment]);
 
 			if (!m_imageStates.contains(reference.attachment))
 			{
 				m_imageStates[reference.attachment].initial_layout = attachment.initialLayout;
-				m_imageStates[reference.attachment].initial_stage  = _pipelineStageFromLayout(attachment.initialLayout, false);
-				m_imageStates[reference.attachment].initial_access = _pipelineAccessFromLayout(attachment.initialLayout, false);
+				m_imageStates[reference.attachment].initial_stage  = _pipelineStageFromLayout(attachment.initialLayout);
+				m_imageStates[reference.attachment].initial_access = _pipelineAccessFromLayout(attachment.initialLayout);
 
 				m_imageStates[reference.attachment].next_layout = attachment.finalLayout;
-				m_imageStates[reference.attachment].next_stage  = _pipelineStageFromLayout(attachment.finalLayout, false);
-				m_imageStates[reference.attachment].next_access = _pipelineAccessFromLayout(attachment.finalLayout, false);
+				m_imageStates[reference.attachment].next_stage  = _pipelineStageFromLayout(attachment.finalLayout);
+				m_imageStates[reference.attachment].next_access = _pipelineAccessFromLayout(attachment.finalLayout);
 			}
 
 			m_imageStates[reference.attachment].final_layout = reference.layout;
-			m_imageStates[reference.attachment].final_stage = _pipelineStageFromLayout(reference.layout, true);
-			m_imageStates[reference.attachment].final_access = _pipelineAccessFromLayout(reference.layout, true);
+			m_imageStates[reference.attachment].final_stage = _pipelineStageFromLayout(reference.layout);
+			m_imageStates[reference.attachment].final_access = _pipelineAccessFromLayout(reference.layout);
 
 			// we handle explicit layout transitions in command buffer end render pass
 			attachment.finalLayout = reference.layout;
 		}
 	}
 
-	vkCreateRenderPass(Scope->GetDevice(), &CreateInfo, VK_NULL_HANDLE, &m_RenderPass);
+	vkCreateRenderPass2(Scope->GetDevice(), &CreateInfo, VK_NULL_HANDLE, &m_RenderPass);
 }
 
 GVkRenderPass::~GVkRenderPass()
@@ -142,7 +142,7 @@ const GVkAttachmentState& GVkRenderPass::_getAttachmentState(uint32_t Index) con
 
 uint32_t RenderPassDescriptor::AddAttachmentLoadOp(VkFormat Format, VkImageLayout InitialLayout, VkImageLayout FinalLayout, VkSampleCountFlagBits Samples)
 {
-	VkAttachmentDescription attachmentDescription{};
+	VkAttachmentDescription2 attachmentDescription{ VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2 };
 	attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 	attachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -157,11 +157,11 @@ uint32_t RenderPassDescriptor::AddAttachmentLoadOp(VkFormat Format, VkImageLayou
 	return m_attachmentDescriptions.size() - 1;
 }
 
-uint32_t RenderPassDescriptor::AddAttachmentDontCareOp(VkFormat Format, VkImageLayout FinalLayout, VkSampleCountFlagBits Samples)
+uint32_t RenderPassDescriptor::AddAttachmentDontCareOp(VkFormat Format, VkImageLayout FinalLayout, VkImageLayout InitialLayout, VkSampleCountFlagBits Samples)
 {
-	VkAttachmentDescription attachmentDescription{};
+	VkAttachmentDescription2 attachmentDescription{ VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2 };
 	attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	attachmentDescription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	attachmentDescription.initialLayout = InitialLayout;
 	attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	attachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	attachmentDescription.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -175,10 +175,10 @@ uint32_t RenderPassDescriptor::AddAttachmentDontCareOp(VkFormat Format, VkImageL
 	return m_attachmentDescriptions.size() - 1;
 }
 
-uint32_t RenderPassDescriptor::AddAttachmentClearOp(VkFormat Format, VkClearValue ClearValue, VkImageLayout FinalLayout, VkSampleCountFlagBits Samples)
+uint32_t RenderPassDescriptor::AddAttachmentClearOp(VkFormat Format, VkClearValue ClearValue, VkImageLayout FinalLayout, VkImageLayout InitialLayout, VkSampleCountFlagBits Samples)
 {
-	VkAttachmentDescription attachmentDescription{};
-	attachmentDescription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	VkAttachmentDescription2 attachmentDescription{ VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2 };
+	attachmentDescription.initialLayout = InitialLayout;
 	attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	attachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -197,20 +197,34 @@ RenderPassDescriptor& RenderPassDescriptor::AddSubpass(const SubpassDescription&
 {
 	GSubpass Subpass;
 	for (auto& colorIndex : SubpassDescription.colorAttachmentsIndices)
-		Subpass.colorReferences.emplace_back(colorIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		Subpass.colorReferences.emplace_back(VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2, nullptr, colorIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
 
 	for (auto& inputIndex : SubpassDescription.inputAttachmentsIndices)
-		Subpass.inputReferences.emplace_back(inputIndex, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	{
+		const auto& Description = m_attachmentDescriptions[inputIndex];
+		Subpass.inputReferences.emplace_back(VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2, nullptr, inputIndex, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, _isDepthFormat(Description.format) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT);
+	}
 
-	Subpass.depthReference = VkAttachmentReference{ SubpassDescription.depthAttachmentIndex, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+	Subpass.depthReference = VkAttachmentReference2{ VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2, nullptr, SubpassDescription.depthAttachmentIndex, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT };
 
 	m_subpasses.push_back(std::move(Subpass));
 	return *this;
 }
 
-std::vector<VkSubpassDependency> RenderPassDescriptor::buildSubpassDependencies()
+RenderPassDescriptor& RenderPassDescriptor::ExternalSync(VkPipelineStageFlags2 PrevStage, VkAccessFlags2 PrevAccess, VkPipelineStageFlags2 NextStage, VkAccessFlags2 NextAccess)
 {
-	std::vector<VkSubpassDependency> dependencies(m_subpasses.size() + 1, VkSubpassDependency{});
+	_prevStage = PrevStage;
+	_prevAccess = PrevAccess;
+
+	_nextStage = NextStage;
+	_nextAccess = NextAccess;
+
+	return *this;
+}
+
+std::vector<VkSubpassDependency2> RenderPassDescriptor::buildSubpassDependencies()
+{
+	std::vector<VkSubpassDependency2> dependencies(m_subpasses.size() + 1, VkSubpassDependency2{ VK_STRUCTURE_TYPE_SUBPASS_DEPENDENCY_2 });
 
 	// build indices
 	for (uint32_t i = 0; i < dependencies.size(); i++)
@@ -265,7 +279,7 @@ std::vector<VkSubpassDependency> RenderPassDescriptor::buildSubpassDependencies(
 			for (auto& attachement : subpass.attachments())
 			{
 				// find previous use for attachment
-				for (uint32_t j = i - 1; j < m_subpasses.size(); j++)
+				for (int32_t j = i - 1; j >= 0; j--)
 				{
 					const auto& previous = m_subpasses[j];
 
@@ -281,27 +295,23 @@ std::vector<VkSubpassDependency> RenderPassDescriptor::buildSubpassDependencies(
 		}
 	}
 
-	// external sync
-	dependencies.front().srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
-	dependencies.back().dstStageMask = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
+	dependencies.back().dstStageMask = _nextStage;
+	dependencies.back().dstAccessMask = _nextAccess;
 
-	for (uint32_t i = 0; i < dependencies.size() - 1; i++)
-	{
-		dependencies.back().srcAccessMask |= dependencies[i].dstAccessMask;
-		dependencies.back().srcStageMask |= dependencies[i].dstStageMask;
-	}
+	dependencies.front().srcStageMask = _prevStage;
+	dependencies.front().srcAccessMask = _prevAccess;
 
 	return dependencies;
 }
 
-std::vector<VkSubpassDescription> RenderPassDescriptor::buildSubpassDescriptions()
+std::vector<VkSubpassDescription2> RenderPassDescriptor::buildSubpassDescriptions()
 {
-	std::vector<VkSubpassDescription> subpassDescriptions;
+	std::vector<VkSubpassDescription2> subpassDescriptions;
 	subpassDescriptions.reserve(m_subpasses.size());
 
 	for (auto& Subpass : m_subpasses)
 	{
-		VkSubpassDescription subpassDescription{};
+		VkSubpassDescription2 subpassDescription{ VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_2 };
 		subpassDescription.colorAttachmentCount = Subpass.colorReferences.size();
 		subpassDescription.pColorAttachments = Subpass.colorReferences.data();
 		subpassDescription.inputAttachmentCount = Subpass.inputReferences.size();
@@ -334,10 +344,10 @@ std::shared_ptr<GVkRenderPass> RenderPassDescriptor::Construct(std::shared_ptr<R
 		AddSubpass(SubpassDS);
 	}
 
-	std::vector<VkSubpassDescription> subpassDescriptions = buildSubpassDescriptions();
-	std::vector<VkSubpassDependency> subpassDependencies  = buildSubpassDependencies();
+	std::vector<VkSubpassDescription2> subpassDescriptions = buildSubpassDescriptions();
+	std::vector<VkSubpassDependency2> subpassDependencies  = buildSubpassDependencies();
 
-	VkRenderPassCreateInfo renderPassCreateInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
+	VkRenderPassCreateInfo2 renderPassCreateInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO_2 };
 	renderPassCreateInfo.attachmentCount = m_attachmentDescriptions.size();
 	renderPassCreateInfo.pAttachments = m_attachmentDescriptions.data();
 	renderPassCreateInfo.dependencyCount = subpassDependencies.size();

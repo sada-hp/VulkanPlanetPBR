@@ -41,13 +41,13 @@ protected:
 	std::shared_ptr<RenderScope> Scope = VK_NULL_HANDLE;
 
 private:
-	void _recursive_register(IRenderStage* stage, std::unordered_map<IRenderStage*, std::unordered_set<IRenderStage*>>& adjacent_list);
-	
-	void _bind_semaphores(IRenderStage* stage, IRenderStage* next, const GStageViews::stage_resource& resource);
-	void _bind_barriers(IRenderStage* stage, IRenderStage* next, const GStageViews::stage_resource& resource);
-
 	void _clear();
 	void _sync(std::vector<IRenderStage*>& list);
+	void _bind_barriers(IRenderStage* stage, IRenderStage* next, const GStageViews::stage_resource& resource);
+	void _bind_semaphores(IRenderStage* stage, IRenderStage* next, const GStageViews::stage_resource& resource);
+	void _reorder_for_async(std::unordered_map<IRenderStage*, std::unordered_set<IRenderStage*>>& adjacent_list);
+	void _recursive_register(IRenderStage* stage, std::unordered_map<IRenderStage*, std::unordered_set<IRenderStage*>>& adjacent_list);
+
 	void _submit_batch(const recording_batch& batch);
 
 public:

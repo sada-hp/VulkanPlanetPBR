@@ -32,7 +32,7 @@ private:
 	std::vector<uint32_t> m_colorAttachmentsCounts;
 
 private:
-	GVkRenderPass(std::shared_ptr<RenderScope> Scope, VkRenderPassCreateInfo CreateInfo, const std::vector<VkClearValue>& ClearValues = {});
+	GVkRenderPass(std::shared_ptr<RenderScope> Scope, VkRenderPassCreateInfo2 CreateInfo, const std::vector<VkClearValue>& ClearValues = {});
 	const GVkAttachmentState& _getAttachmentState(uint32_t Index) const;
 
 public:
@@ -56,9 +56,9 @@ class RenderPassDescriptor
 {
 	struct GSubpass
 	{
-		std::vector<VkAttachmentReference> colorReferences = {};
-		std::vector<VkAttachmentReference> inputReferences = {};
-		VkAttachmentReference depthReference = { VK_ATTACHMENT_UNUSED };
+		std::vector<VkAttachmentReference2> colorReferences = {};
+		std::vector<VkAttachmentReference2> inputReferences = {};
+		VkAttachmentReference2 depthReference{ VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2, nullptr, VK_ATTACHMENT_UNUSED, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_DEPTH_BIT };
 
 		std::vector<uint32_t> attachments() const
 		{
@@ -110,20 +110,27 @@ class RenderPassDescriptor
 		}
 	};
 
-	std::vector<VkAttachmentDescription> m_attachmentDescriptions = {};
+	std::vector<VkAttachmentDescription2> m_attachmentDescriptions = {};
 	std::vector<VkClearValue> m_clearValues = {};
 	std::vector<GSubpass> m_subpasses = {};
 
+	VkPipelineStageFlags2 _prevStage = VK_PIPELINE_STAGE_2_NONE;
+	VkAccessFlags2 _prevAccess = VK_ACCESS_2_NONE;
+
+	VkPipelineStageFlags2 _nextStage = VK_PIPELINE_STAGE_2_NONE;
+	VkAccessFlags2 _nextAccess = VK_ACCESS_2_NONE;
+
 private:
-	std::vector<VkSubpassDescription> buildSubpassDescriptions();
-	std::vector<VkSubpassDependency> buildSubpassDependencies();
+	std::vector<VkSubpassDescription2> buildSubpassDescriptions();
+	std::vector<VkSubpassDependency2> buildSubpassDependencies();
 
 public:
-	uint32_t AddAttachmentDontCareOp(VkFormat Format, VkImageLayout FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VkSampleCountFlagBits Samples = VK_SAMPLE_COUNT_1_BIT);
+	uint32_t AddAttachmentDontCareOp(VkFormat Format, VkImageLayout FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VkImageLayout InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED, VkSampleCountFlagBits Samples = VK_SAMPLE_COUNT_1_BIT);
 	uint32_t AddAttachmentLoadOp(VkFormat Format, VkImageLayout InitialLayout, VkImageLayout FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VkSampleCountFlagBits Samples = VK_SAMPLE_COUNT_1_BIT);
-	uint32_t AddAttachmentClearOp(VkFormat Format, VkClearValue ClearValue = VkClearValue{}, VkImageLayout FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VkSampleCountFlagBits Samples = VK_SAMPLE_COUNT_1_BIT);
+	uint32_t AddAttachmentClearOp(VkFormat Format, VkClearValue ClearValue = VkClearValue{}, VkImageLayout FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VkImageLayout InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED, VkSampleCountFlagBits Samples = VK_SAMPLE_COUNT_1_BIT);
 	
 	RenderPassDescriptor& AddSubpass(const SubpassDescription& Subpass);
+	RenderPassDescriptor& ExternalSync(VkPipelineStageFlags2 PrevStage, VkAccessFlags2 PrevAccess, VkPipelineStageFlags2 NextStage, VkAccessFlags2 NextAccess);
 
 	std::shared_ptr<GVkRenderPass> Construct(std::shared_ptr<RenderScope> Scope);
 };

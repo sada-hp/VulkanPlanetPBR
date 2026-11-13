@@ -20,6 +20,7 @@ void IGApplication::Run()
 		double delta = time - _timestamp;
 
 		Window.ProcessEvents();
+		Camera.GetProjectionMatrix().SetAspect(Window.GetAspectRatio());
 		Update(delta);
 
 		auto& Renderer = Window.GetRenderer();

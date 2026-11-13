@@ -2,6 +2,10 @@
 
 bool _stageSupported(VkQueueFlags queue, VkPipelineStageFlags2 stage)
 {
+	stage &= ~VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
+	stage &= ~VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+	stage &= ~VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+
 	if (queue == VK_QUEUE_TRANSFER_BIT)
 	{
 		stage &= ~VK_PIPELINE_STAGE_2_TRANSFER_BIT;
@@ -54,6 +58,38 @@ void GFrameGraph::_recursive_register(IRenderStage* stage, std::unordered_map<IR
 	}
 }
 
+void GFrameGraph::_reorder_for_async(std::unordered_map<IRenderStage*, std::unordered_set<IRenderStage*>>& adjacent_list)
+{
+	std::vector<IRenderStage*> _asyncPasses = {};
+	std::vector<IRenderStage*> _otherPasses = {};
+
+	for (auto& Stage : _ordererd)
+	{
+		bool waitsOnGQ = Stage->Type == VK_QUEUE_GRAPHICS_BIT;
+
+		if (!waitsOnGQ)
+		{
+			for (auto& adjacent : adjacent_list[Stage])
+			{
+				if (adjacent->Type == VK_QUEUE_GRAPHICS_BIT)
+				{
+					waitsOnGQ = true;
+					break;
+				}
+			}
+		}
+
+		if (!waitsOnGQ)
+			_asyncPasses.push_back(Stage);
+		else
+			_otherPasses.push_back(Stage);
+	}
+
+	_ordererd.clear();
+	_ordererd.insert(_ordererd.end(), _asyncPasses.begin(), _asyncPasses.end());
+	_ordererd.insert(_ordererd.end(), _otherPasses.begin(), _otherPasses.end());
+}
+
 void GFrameGraph::_bind_semaphores(IRenderStage* stage, IRenderStage* next, const GStageViews::stage_resource& resource)
 {
 	VkPipelineStageFlags2 flags = resource.stage;
@@ -71,9 +107,6 @@ void GFrameGraph::_bind_semaphores(IRenderStage* stage, IRenderStage* next, cons
 
 void GFrameGraph::_bind_barriers(IRenderStage* stage, IRenderStage* next, const GStageViews::stage_resource& resource)
 {
-	if (stage->Type == next->Type)
-		return;
-
 	VkPipelineStageFlags2 flags = resource.stage;
 	VkAccessFlagBits2 access = resource.access;
 
@@ -117,6 +150,8 @@ void GFrameGraph::_sync(std::vector<IRenderStage*>& list)
 	for (auto& stage : list)
 		_recursive_register(stage, _adjacentLists);
 
+	_reorder_for_async(_adjacentLists);
+
 	for (size_t i = 0; i < _ordererd.size(); i++)
 	{
 		IRenderStage* stage = _ordererd[i];
@@ -132,8 +167,12 @@ void GFrameGraph::_sync(std::vector<IRenderStage*>& list)
 				auto next_it = next->Resources.find_similar(resource);
 				if (next_it != next->Resources.end() && !visited.contains(resource.ptr()))
 				{
-					_bind_semaphores(stage, next, resource);
-					_bind_barriers(stage, next, resource);
+					if (stage->Type != next->Type)
+					{
+						_bind_semaphores(stage, next, resource);
+						_bind_barriers(stage, next, resource);
+					}
+
 					visited.insert(resource.ptr());
 				}
 			}
@@ -242,8 +281,6 @@ void GFrameGraph::Draw(const GCamera& Camera, const IWorld& World)
 
 	for (auto& batch : _batches)
 	{
-		batch.fence->Wait();
-
 		for (auto& stage : batch.stages)
 		{
 			stage->_bind_acquire_barriers(_ownershipsIn[stage]);

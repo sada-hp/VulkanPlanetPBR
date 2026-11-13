@@ -16,7 +16,6 @@ protected:
 	std::shared_ptr<GVkSwapchain> m_Swapchain = VK_NULL_HANDLE;
 	std::shared_ptr<GVkSemaphore> m_PresentSemaphore = VK_NULL_HANDLE;
 	std::shared_ptr<GVkCommandBuffer> m_BlitCommandBuffer = VK_NULL_HANDLE;
-	std::shared_ptr<GVkCommandBuffer> m_DrawCommandBuffer = VK_NULL_HANDLE;
 
 protected:
 	GVulkanBase(GLFWwindow* window);

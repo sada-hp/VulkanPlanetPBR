@@ -9,7 +9,7 @@ void RenderScope::_createDevice()
 {
 	std::vector<const char*> extensionsList = { VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_EXT_CONDITIONAL_RENDERING_EXTENSION_NAME };
 
-	auto enumerateExtensions = [extensionsList](const VkPhysicalDevice& physicalDevice)
+	auto enumerateExtensions = [&extensionsList](const VkPhysicalDevice& physicalDevice)
 	{
 		uint32_t extensionCount;
 
@@ -47,7 +47,7 @@ void RenderScope::_createDevice()
 
 bool RenderScope::_createLogicalDevice(VkPhysicalDevice physicalDevice, const std::vector<const char*>& device_extensions)
 {
-	VkPhysicalDeviceConditionalRenderingFeaturesEXT availableconditionalRenderinFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES };
+	VkPhysicalDeviceConditionalRenderingFeaturesEXT availableconditionalRenderinFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CONDITIONAL_RENDERING_FEATURES_EXT };
 	VkPhysicalDeviceSynchronization2Features availableSynchronization2Features{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES, &availableconditionalRenderinFeatures };
 	VkPhysicalDeviceVulkan12Features availableFeaturesVk12{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES, &availableSynchronization2Features };
 	VkPhysicalDeviceFeatures2 availableFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, &availableFeaturesVk12 };
@@ -195,7 +195,7 @@ void RenderScope::_createVulkanInstance()
 		extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
 		debugCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT;
-		debugCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT;
+		debugCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 		debugCreateInfo.pfnUserCallback = _debugCallback;
 
 		createInfo.ppEnabledLayerNames = layers.data();

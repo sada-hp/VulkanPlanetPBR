@@ -31,7 +31,7 @@ public:
 	inline const VkSemaphore& operator[](size_t index) const { return m_flightResources.at(index % m_flightResources.size()).semaphore; }
 
 public:
-	GVkSemaphore(std::shared_ptr<RenderScope> Scope, VkPipelineStageFlags Stage, ESemaphoreFlags Flags);
+	GVkSemaphore(std::shared_ptr<RenderScope> Scope, VkPipelineStageFlags Stage, ESemaphoreFlags Flags = ESemaphoreFlags::None);
 	virtual ~GVkSemaphore();
 
 	bool IsInFlight() const { return m_flightResources.size() != 1; }

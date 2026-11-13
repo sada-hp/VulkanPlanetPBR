@@ -20,7 +20,9 @@ GVkSwapchain::~GVkSwapchain()
 
 void GVkSwapchain::_clear()
 {
-	m_acquireFence = VK_NULL_HANDLE;
+	vkDeviceWaitIdle(Scope->GetDevice());
+
+	m_acquireSemaphore = VK_NULL_HANDLE;
 
 	for (auto& [image, view, state, sem] : m_swapchainResources)
 		vkDestroyImageView(Scope->GetDevice(), view, VK_NULL_HANDLE);
@@ -36,11 +38,6 @@ void GVkSwapchain::_createSurface(GLFWwindow* window)
 {
 	auto res = glfwCreateWindowSurface(Scope->GetInstance(), window, VK_NULL_HANDLE, &m_Surface);
 	assert(res == VK_SUCCESS);
-}
-
-void GVkSwapchain::_createFence()
-{
-	m_acquireFence = std::make_shared<GVkFence>(Scope, EFenceFlags::CreateSignaled);
 }
 
 void GVkSwapchain::_createSwapchain()
@@ -92,7 +89,10 @@ void GVkSwapchain::_createSwapchain()
 
 		VkSwapchainCreateInfoKHR createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-		createInfo.minImageCount = std::clamp(Scope->GetMaxFramesInFlight(), capabilities.minImageCount, capabilities.maxImageCount);
+
+		uint32_t maxImages = capabilities.maxImageCount > 0 ? capabilities.maxImageCount : UINT32_MAX;
+		createInfo.minImageCount = std::clamp(Scope->GetMaxFramesInFlight(), capabilities.minImageCount, maxImages);
+
 		createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 		createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 		createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -130,36 +130,24 @@ void GVkSwapchain::_createSwapchain()
 			vkCreateImageView(Scope->GetDevice(), &viewCreateInfo, VK_NULL_HANDLE, &m_swapchainResources[i].view);
 		}
 
-		_createFence();
+		m_acquireSemaphore = std::make_shared<GVkSemaphore>(Scope, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, ESemaphoreFlags::InFlight);
 	}
-}
-
-void GVkSwapchain::_wait() const
-{
-	if (m_acquireFence)
-		m_acquireFence->Wait();
 }
 
 const VkImage& GVkSwapchain::GetImage() const
 {
-	_wait();
-
 	auto& object = _activeObj();
 	return object.image;
 }
 
 const VkImageView& GVkSwapchain::GetImageView() const
 {
-	_wait();
-
 	auto& object = _activeObj();
 	return object.view;
 }
 
 const GVkSwapchainState& GVkSwapchain::GetImageState() const
 {
-	_wait();
-
 	auto& object = _activeObj();
 	return object.state;
 }
@@ -177,32 +165,34 @@ void GVkSwapchain::SetImageState(VkImageLayout Layout, VkPipelineStageFlags Stag
 	object.state.stage = Stage;
 }
 
-bool GVkSwapchain::QueryNextImage()
+bool GVkSwapchain::QueryNextImage(std::shared_ptr<GVkFence> WaitFence)
 {
 	if (!m_Swapchain)
 		_createSwapchain();
 
 	if (m_Swapchain)
 	{
-		m_acquireFence->Reset();
-		VkResult SwapchainStatus = vkAcquireNextImageKHR(Scope->GetDevice(), m_Swapchain, UINT64_MAX, VK_NULL_HANDLE, m_acquireFence->GetFence(), &m_SwapchainIndex);
+		if (WaitFence)
+			WaitFence->Wait();
+
+		VkResult SwapchainStatus = vkAcquireNextImageKHR(Scope->GetDevice(), m_Swapchain, UINT64_MAX, m_acquireSemaphore->GetSignalSemaphore(), VK_NULL_HANDLE, &m_SwapchainIndex);
 
 		if (SwapchainStatus != VK_SUCCESS)
-		{
-			m_acquireFence->Signal();
 			_clear();
-		}
 	}
 
 	return m_Swapchain != VK_NULL_HANDLE;
 }
 
+std::shared_ptr<GVkSemaphore> GVkSwapchain::GetAcquireSemaphore() const
+{
+	return m_acquireSemaphore;
+}
+
 void GVkSwapchain::Present(std::shared_ptr<GVkSemaphore> waitSemaphore)
 {
-	_wait();
-
 	auto& object = _activeObj();
-	object.acquired_semaphore = waitSemaphore;
+	object.waitSemaphore = waitSemaphore;
 
 	VkSemaphore semaphore = VK_NULL_HANDLE;
 

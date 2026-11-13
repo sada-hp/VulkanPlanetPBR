@@ -22,7 +22,6 @@ GVulkanBase::GVulkanBase(GLFWwindow* window)
 	m_Swapchain = std::make_shared<GVkSwapchain>(m_Scope, window);
 	m_PresentSemaphore = std::make_shared<GVkSemaphore>(m_Scope, VK_PIPELINE_STAGE_TRANSFER_BIT, ESemaphoreFlags::InFlight);
 	m_BlitCommandBuffer = std::make_shared<GVkCommandBuffer>(m_Scope, VK_QUEUE_GRAPHICS_BIT, ECmdFlags::InFlight);
-	m_DrawCommandBuffer = std::make_shared<GVkCommandBuffer>(m_Scope, VK_QUEUE_GRAPHICS_BIT, ECmdFlags::InFlight);
 
 	GVkSharedResources::Instance.FinalTarget = GVkImageFactory::FinalRenderTargetFlight(m_Scope, m_Swapchain->GetExtent());
 	GVkSharedResources::Instance.ColorBuffer = GVkImageFactory::ColorRenderTargetFlight(m_Scope, m_Swapchain->GetExtent());
@@ -48,20 +47,16 @@ GVulkanBase::~GVulkanBase()
 
 bool GVulkanBase::Draw(const GCamera& Camera, const IWorld& World)
 {
-	if (m_Swapchain->QueryNextImage())
+	m_FrameGraph->Draw(Camera, World);
+
+	bool SwapchainValid = true;
+	if (SwapchainValid = m_Swapchain->QueryNextImage(m_BlitCommandBuffer->GetFence()))
 	{
-		float Aspect = static_cast<float>(m_Swapchain->GetExtent().width) / static_cast<float>(m_Swapchain->GetExtent().height);
-		const_cast<GCamera&>(Camera).GetProjectionMatrix().SetAspect(Aspect);
-
-		m_FrameGraph->Draw(Camera, World);
-
 		m_BlitCommandBuffer->BlitImage(GVkImage::ToView(GVkSharedResources::Instance.FinalTarget), m_Swapchain);
-		m_BlitCommandBuffer->Submit({}, { m_PresentSemaphore });
+		m_BlitCommandBuffer->Submit({ m_Swapchain->GetAcquireSemaphore() }, { m_PresentSemaphore });
 		m_Swapchain->Present(m_PresentSemaphore);
-
-		m_Scope->IncrementFlightIndex();
-		return true;
 	}
 
-	return false;
+	m_Scope->IncrementFlightIndex();
+	return SwapchainValid;
 }
