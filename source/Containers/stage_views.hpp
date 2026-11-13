@@ -200,8 +200,8 @@ public:
 					image_resource res{};
 					res.layout = layout;
 					res.access = access;
+					res.view = newview;
 					res.stage = stage;
-					res.view = view;
 					res.Op = Op;
 
 					_images.emplace_back(std::move(res));
