@@ -10,7 +10,7 @@ class GVkDescriptorSetLayout : public IVkObj
 
 private:
 	VkDescriptorSetLayout m_descriptorSetLayout = VK_NULL_HANDLE;
-	std::shared_ptr<RenderScope> Scope = VK_NULL_HANDLE;
+	std::shared_ptr<RenderScope> m_Scope = VK_NULL_HANDLE;
 
 private:
 	GVkDescriptorSetLayout(std::shared_ptr<RenderScope> Scope, const VkDescriptorSetLayoutCreateInfo& info);
@@ -31,7 +31,7 @@ class GVkDescriptorSet : public IVkObj
 	};
 
 private:
-	std::shared_ptr<RenderScope> Scope = VK_NULL_HANDLE;
+	std::shared_ptr<RenderScope> m_Scope = VK_NULL_HANDLE;
 
 	std::vector<std::shared_ptr<IVkObj>> m_sharedResources = {};
 	std::vector<_internalObj> m_flightResources = {};
@@ -40,7 +40,7 @@ private:
 	VkDescriptorPool m_descriptorSetPool = VK_NULL_HANDLE;
 
 private:
-	size_t _activeIndex() const { return Scope->GetResourceIndex() % m_flightResources.size(); }
+	size_t _activeIndex() const { return m_Scope->GetResourceIndex() % m_flightResources.size(); }
 	const _internalObj& _activeObj() const { return m_flightResources.at(_activeIndex()); }
 	_internalObj& _activeObj() { return m_flightResources.at(_activeIndex()); }
 

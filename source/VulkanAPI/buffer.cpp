@@ -1,8 +1,8 @@
 #include "pch.hpp"
 #include "buffer.hpp"
 
-GVkBuffer::GVkBuffer(std::shared_ptr<RenderScope> InScope, size_t Size, EBufferFlags Flags)
-	: Scope(InScope)
+GVkBuffer::GVkBuffer(const std::shared_ptr<RenderScope>& InScope, size_t Size, EBufferFlags Flags)
+	: m_Scope(InScope)
 	, m_flags(Flags)
 	, m_size(Size)
 {
@@ -71,13 +71,13 @@ GVkBuffer::GVkBuffer(std::shared_ptr<RenderScope> InScope, size_t Size, EBufferF
 	//createInfo.pQueueFamilyIndices = queueFamilies.data();
 
 	if (CheckFlag(Flags, EBufferFlags::InFlight))
-		m_flightResources.resize(Scope->GetMaxFramesInFlight());
+		m_flightResources.resize(m_Scope->GetMaxFramesInFlight());
 	else
 		m_flightResources.resize(1);
 
 	for (auto& object : m_flightResources)
 	{
-		auto res = vmaCreateBuffer(Scope->GetAllocator(), &createInfo, &allocCreateInfo, &object.buffer, &object.memory, VK_NULL_HANDLE);
+		auto res = vmaCreateBuffer(m_Scope->GetAllocator(), &createInfo, &allocCreateInfo, &object.buffer, &object.memory, VK_NULL_HANDLE);
 		assert(res == VK_SUCCESS);
 	}
 }
@@ -85,14 +85,14 @@ GVkBuffer::GVkBuffer(std::shared_ptr<RenderScope> InScope, size_t Size, EBufferF
 GVkBuffer::~GVkBuffer()
 {
 	for (auto& object : m_flightResources)
-		vmaDestroyBuffer(Scope->GetAllocator(), object.buffer, object.memory);
+		vmaDestroyBuffer(m_Scope->GetAllocator(), object.buffer, object.memory);
 }
 
 VmaAllocationInfo GVkBuffer::_allocationInfo() const
 {
 	auto& object = _activeObj();
 	VmaAllocationInfo allocInfo{};
-	vmaGetAllocationInfo(Scope->GetAllocator(), object.memory, &allocInfo);
+	vmaGetAllocationInfo(m_Scope->GetAllocator(), object.memory, &allocInfo);
 
 	return allocInfo;
 }
@@ -101,7 +101,7 @@ VkMemoryPropertyFlags GVkBuffer::_memoryFlags() const
 {
 	auto& object = _activeObj();
 	VkMemoryPropertyFlags memFlags;
-	vmaGetAllocationMemoryProperties(Scope->GetAllocator(), object.memory, &memFlags);
+	vmaGetAllocationMemoryProperties(m_Scope->GetAllocator(), object.memory, &memFlags);
 
 	return memFlags;
 }
@@ -137,8 +137,8 @@ void* GVkBuffer::Map(size_t Offset, size_t Size)
 
 		Size = Size == VK_WHOLE_SIZE ? allocInfo.size - Offset : Size;
 
-		vmaInvalidateAllocation(Scope->GetAllocator(), object.memory, Offset, Size);
-		vmaMapMemory(Scope->GetAllocator(), object.memory, &allocInfo.pMappedData);
+		vmaInvalidateAllocation(m_Scope->GetAllocator(), object.memory, Offset, Size);
+		vmaMapMemory(m_Scope->GetAllocator(), object.memory, &allocInfo.pMappedData);
 
 		return (char*)allocInfo.pMappedData + Offset;
 	}
@@ -153,10 +153,10 @@ void GVkBuffer::UnMap(size_t Offset, size_t Size)
 	if (allocInfo.pMappedData)
 	{
 		auto& object = _activeObj();
-		vmaUnmapMemory(Scope->GetAllocator(), object.memory);
+		vmaUnmapMemory(m_Scope->GetAllocator(), object.memory);
 
 		Size = Size == VK_WHOLE_SIZE ? allocInfo.size - Offset : Size;
-		vmaFlushAllocation(Scope->GetAllocator(), object.memory, Offset, Size);
+		vmaFlushAllocation(m_Scope->GetAllocator(), object.memory, Offset, Size);
 	}
 }
 

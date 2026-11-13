@@ -36,7 +36,7 @@ class GVkCommandBuffer : public IVkObj
 		std::shared_ptr<GVkPipeline> pipeline = VK_NULL_HANDLE;
 		std::shared_ptr<GVkRenderPass> renderPass = VK_NULL_HANDLE;
 		std::shared_ptr<GVkFramebuffer> framebuffer = VK_NULL_HANDLE;
-		std::vector<std::shared_ptr<IVkObj>> acquired_resources;
+		std::unordered_set<std::shared_ptr<IVkObj>> acquired_resources;
 	};
 
 private:
@@ -44,14 +44,14 @@ private:
 	PFN_vkCmdEndConditionalRenderingEXT vkCmdEndConditionalRendering;
 
 private:
-	std::shared_ptr<RenderScope> Scope = VK_NULL_HANDLE;
+	std::shared_ptr<RenderScope> m_Scope = VK_NULL_HANDLE;
 	std::vector<_internalObj> m_flightResources = {};
 
 	ECmdFlags m_cmdFlags = ECmdFlags::Default;
 	VkQueueFlagBits m_qFlags;
 
 private:
-	size_t _activeIndex() const { return Scope->GetResourceIndex() % m_flightResources.size(); }
+	size_t _activeIndex() const { return m_Scope->GetResourceIndex() % m_flightResources.size(); }
 	const _internalObj& _activeObj() const { return m_flightResources[_activeIndex()]; }
 	_internalObj& _activeObj() { return m_flightResources[_activeIndex()]; }
 
@@ -60,13 +60,13 @@ private:
 	void _reset(_internalObj& object);
 	void _end(_internalObj& object);
 	
-	void _acquire(std::shared_ptr<IVkObj> obj);
+	void _acquire(const std::shared_ptr<IVkObj>& obj);
 
 	_internalObj& _updateRecording(const VkCommandBufferInheritanceInfo* inheritance = VK_NULL_HANDLE);
 	void _nextSubpass(VkSubpassContents Contents);
 
 public:
-	GVkCommandBuffer(std::shared_ptr<RenderScope> Scope, VkQueueFlagBits Queue, ECmdFlags Flags = ECmdFlags::Default);
+	GVkCommandBuffer(const std::shared_ptr<RenderScope>& Scope, VkQueueFlagBits Queue, ECmdFlags Flags = ECmdFlags::Default);
 	~GVkCommandBuffer();
 
 	VkQueueFlagBits GetType() const { return m_qFlags; }
@@ -80,53 +80,53 @@ public:
 
 	void Submit(const std::vector<std::shared_ptr<GVkSemaphore>>& waitSemaphores = {}, const std::vector<std::shared_ptr<GVkSemaphore>>& signalSemaphores = {});
 
-	void BlitImage(std::shared_ptr<GVkImageView> Image, std::shared_ptr<GVkSwapchain> Swapchain);
-	void BlitImage(std::shared_ptr<GVkImageView> Source, std::shared_ptr<GVkImageView> Destination);
+	void BlitImage(const std::shared_ptr<GVkImageView>& Image, const std::shared_ptr<GVkSwapchain>& Swapchain);
+	void BlitImage(const std::shared_ptr<GVkImageView>& Source, const std::shared_ptr<GVkImageView>& Destination);
 
-	void UpdateBuffer(std::shared_ptr<GVkBufferView> View, char* Data);
-	void CopyBuffer(std::shared_ptr<GVkBufferView> BufferSrc, std::shared_ptr<GVkBufferView> BufferDst);
-	void CopyBuffer(std::shared_ptr<GVkBufferView> BufferSrc, std::shared_ptr<GVkImageView> ImageDst);
+	void UpdateBuffer(const std::shared_ptr<GVkBufferView>& View, const char* Data);
+	void CopyBuffer(const std::shared_ptr<GVkBufferView>& BufferSrc, const std::shared_ptr<GVkBufferView>& BufferDst);
+	void CopyBuffer(const std::shared_ptr<GVkBufferView>& BufferSrc, const std::shared_ptr<GVkImageView>& ImageDst);
 
-	void GenerateMipMaps(std::shared_ptr<GVkImage> Image);
+	void GenerateMipMaps(const std::shared_ptr<GVkImage>& Image);
 
-	void ClearBuffer(std::shared_ptr<GVkBufferView> View, uint32_t Value);
-	void ClearImage(std::shared_ptr<GVkImageView> View, VkClearColorValue ClearValue);
-	void ClearImage(std::shared_ptr<GVkImageView> View, VkClearDepthStencilValue ClearValue);
+	void ClearBuffer(const std::shared_ptr<GVkBufferView>& View, uint32_t Value);
+	void ClearImage(const std::shared_ptr<GVkImageView>& View, VkClearColorValue ClearValue);
+	void ClearImage(const std::shared_ptr<GVkImageView>& View, VkClearDepthStencilValue ClearValue);
 
-	void BeginRenderPass(std::shared_ptr<GVkRenderPass> RenderPass, std::shared_ptr<GVkFramebuffer> Framebuffer, VkSubpassContents Contents = VK_SUBPASS_CONTENTS_INLINE);
+	void BeginRenderPass(const std::shared_ptr<GVkRenderPass>& RenderPass, const std::shared_ptr<GVkFramebuffer>& Framebuffer, VkSubpassContents Contents = VK_SUBPASS_CONTENTS_INLINE);
 	void EndRenderPass();
 
-	void BindPipeline(std::shared_ptr<GVkPipeline> Pipeline);
-	void BindDescriptorSet(uint32_t Slot, std::shared_ptr<GVkDescriptorSet> Set);
+	void BindPipeline(const std::shared_ptr<GVkPipeline>& Pipeline);
+	void BindDescriptorSet(uint32_t Slot, const std::shared_ptr<GVkDescriptorSet>& Set);
 
 	void Draw(uint32_t VertexCount, uint32_t InstanceCount = 1u, uint32_t BaseVertex = 0u, uint32_t BaseInstance = 0u);
 	void Dispatch(uint32_t X, uint32_t Y, uint32_t Z);
 
-	void BindVertexBuffer(uint32_t Slot, std::shared_ptr<GVkBufferView> Buffer);
-	void BindIndexBuffer(VkIndexType Type, std::shared_ptr<GVkBufferView> Buffer);
+	void BindVertexBuffer(uint32_t Slot, const std::shared_ptr<GVkBufferView>& Buffer);
+	void BindIndexBuffer(VkIndexType Type, const std::shared_ptr<GVkBufferView>& Buffer);
 	void DrawIndexed(uint32_t Count, uint32_t InstanceCount = 1u, uint32_t BaseVertex = 0u, uint32_t FirstIndex = 0u, uint32_t BaseInstance = 0u);
 
-	void DrawIndirectCount(std::shared_ptr<GVkBuffer> IndirectBuffer, std::shared_ptr<GVkBuffer> CountBuffer, size_t CountOffset, uint32_t MaxCounts = 1, uint32_t Stride = sizeof(VkDrawIndirectCommand));
-	void DrawIndirectIndexedCount(std::shared_ptr<GVkBuffer> IndirectBuffer, std::shared_ptr<GVkBuffer> CountBuffer, size_t CountOffset, uint32_t MaxCounts = 1, uint32_t Stride = sizeof(VkDrawIndexedIndirectCommand));
+	void DrawIndirectCount(const std::shared_ptr<GVkBuffer>& IndirectBuffer, const std::shared_ptr<GVkBuffer>& CountBuffer, size_t CountOffset, uint32_t MaxCounts = 1, uint32_t Stride = sizeof(VkDrawIndirectCommand));
+	void DrawIndirectIndexedCount(const std::shared_ptr<GVkBuffer>& IndirectBuffer, const std::shared_ptr<GVkBuffer>& CountBuffer, size_t CountOffset, uint32_t MaxCounts = 1, uint32_t Stride = sizeof(VkDrawIndexedIndirectCommand));
 	
-	void DrawIndirect(std::shared_ptr<GVkBufferView> IndirectBuffer);
-	void DrawIndirectIndexed(std::shared_ptr<GVkBufferView> IndirectBuffer);
+	void DrawIndirect(const std::shared_ptr<GVkBufferView>& IndirectBuffer);
+	void DrawIndirectIndexed(const std::shared_ptr<GVkBufferView>& IndirectBuffer);
 
-	void BeginConditionalRendering(std::shared_ptr<GVkBufferView> Buffer);
+	void BeginConditionalRendering(const std::shared_ptr<GVkBufferView>& Buffer);
 	void EndConditionalRendering();
 
 	void SetRenderArea(const VkRect2D& Scissor, const VkViewport& Viewport);
 	void NextSubpass(VkSubpassContents Contents = VK_SUBPASS_CONTENTS_INLINE);
 
-	void Execute(std::shared_ptr<GVkCommandBuffer> Commands);
+	void Execute(const std::shared_ptr<GVkCommandBuffer>& Commands);
 	void Reset();
 
-	void SetFence(std::shared_ptr<GVkFence> fence);
+	void SetFence(const std::shared_ptr<GVkFence>& fence);
 	std::shared_ptr<GVkFence> GetFence() const;
 
 public:
 	template<std::derived_from<GVkBarrier> BarrierType, typename T, typename ...Args>
-	inline void BindBarrier(std::shared_ptr<T> target, Args&&... args)
+	inline void BindBarrier(const std::shared_ptr<T>& target, Args&&... args)
 	{
 		auto& object = _updateRecording();
 

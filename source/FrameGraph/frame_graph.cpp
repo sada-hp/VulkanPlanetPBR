@@ -1,6 +1,6 @@
 #include "frame_graph.hpp"
 
-bool _stageSupported(VkQueueFlags queue, VkPipelineStageFlags2 stage)
+static bool _stageSupported(VkQueueFlags queue, VkPipelineStageFlags2 stage)
 {
 	stage &= ~VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
 	stage &= ~VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
@@ -26,50 +26,54 @@ bool _stageSupported(VkQueueFlags queue, VkPipelineStageFlags2 stage)
 }
 
 GFrameGraph::GFrameGraph(std::shared_ptr<RenderScope> InScope)
-	: Scope(InScope)
+	: m_Scope(InScope)
 {
 }
 
 GFrameGraph::~GFrameGraph()
 {
 	_clear();
-
-	for (auto& stage : _stages)
-		delete stage;
 }
 
 void GFrameGraph::_clear()
 {
-	_batches.clear();
-	_ordererd.clear();
-	_semaphores.clear();
-	_ownershipsIn.clear();
-	_ownershipsOut.clear();
+	m_batches.clear();
+	m_semaphores.clear();
+	m_ownershipsIn.clear();
+	m_ownershipsOut.clear();
 }
 
-void GFrameGraph::_recursive_register(IRenderStage* stage, std::unordered_map<IRenderStage*, std::unordered_set<IRenderStage*>>& adjacent_list)
+void GFrameGraph::_recursive_register(IRenderStage* stage, std::unordered_map<IRenderStage*, adjacent_data>& adjacent_list, std::vector<IRenderStage*>& target_list)
 {
-	for (auto& adjacent : adjacent_list[stage])
-		_recursive_register(adjacent, adjacent_list);
-
-	if (std::find(_ordererd.begin(), _ordererd.end(), stage) == _ordererd.end())
+	if (adjacent_list[stage].owner_state == e_dfs_state::unvisited)
 	{
-		_ordererd.push_back(stage);
+		adjacent_list[stage].owner_state = e_dfs_state::active;
+
+		for (auto& adjacent : adjacent_list[stage].list)
+		{
+			auto state = adjacent_list[adjacent].owner_state;
+
+			assert(state != e_dfs_state::active);
+			_recursive_register(adjacent, adjacent_list, target_list);
+		}
+
+		adjacent_list[stage].owner_state = e_dfs_state::done;
+		target_list.push_back(stage);
 	}
 }
 
-void GFrameGraph::_reorder_for_async(std::unordered_map<IRenderStage*, std::unordered_set<IRenderStage*>>& adjacent_list)
+void GFrameGraph::_reorder_for_async(const std::unordered_map<IRenderStage*, adjacent_data>& adjacent_list, std::vector<IRenderStage*>& target_list)
 {
 	std::vector<IRenderStage*> _asyncPasses = {};
 	std::vector<IRenderStage*> _otherPasses = {};
 
-	for (auto& Stage : _ordererd)
+	for (auto& Stage : target_list)
 	{
 		bool waitsOnGQ = Stage->Type == VK_QUEUE_GRAPHICS_BIT;
 
 		if (!waitsOnGQ)
 		{
-			for (auto& adjacent : adjacent_list[Stage])
+			for (auto& adjacent : adjacent_list.at(Stage).list)
 			{
 				if (adjacent->Type == VK_QUEUE_GRAPHICS_BIT)
 				{
@@ -85,9 +89,9 @@ void GFrameGraph::_reorder_for_async(std::unordered_map<IRenderStage*, std::unor
 			_otherPasses.push_back(Stage);
 	}
 
-	_ordererd.clear();
-	_ordererd.insert(_ordererd.end(), _asyncPasses.begin(), _asyncPasses.end());
-	_ordererd.insert(_ordererd.end(), _otherPasses.begin(), _otherPasses.end());
+	target_list.clear();
+	target_list.insert(target_list.end(), _asyncPasses.begin(), _asyncPasses.end());
+	target_list.insert(target_list.end(), _otherPasses.begin(), _otherPasses.end());
 }
 
 void GFrameGraph::_bind_semaphores(IRenderStage* stage, IRenderStage* next, const GStageViews::stage_resource& resource)
@@ -100,9 +104,9 @@ void GFrameGraph::_bind_semaphores(IRenderStage* stage, IRenderStage* next, cons
 	if (resource.Op == EResourceOp::WriteOnly)
 		flags = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
 
-	std::shared_ptr<GVkSemaphore> semaphore = std::make_shared<GVkSemaphore>(Scope, flags, ESemaphoreFlags::InFlight);
-	_semaphores[stage].signalSemaphores.push_back(semaphore);
-	_semaphores[next].waitSemaphores.push_back(semaphore);
+	std::shared_ptr<GVkSemaphore> semaphore = std::make_shared<GVkSemaphore>(m_Scope, flags, ESemaphoreFlags::InFlight);
+	m_semaphores[stage].signalSemaphores.push_back(semaphore);
+	m_semaphores[next].waitSemaphores.push_back(semaphore);
 }
 
 void GFrameGraph::_bind_barriers(IRenderStage* stage, IRenderStage* next, const GStageViews::stage_resource& resource)
@@ -118,12 +122,12 @@ void GFrameGraph::_bind_barriers(IRenderStage* stage, IRenderStage* next, const 
 
 	std::shared_ptr<GVkBarrier> barrier;
 	if (resource.is_texture())
-		barrier = std::make_shared<GVkBarrier>(static_cast<const GStageViews::image_resource&>(resource).view, flags, access, Scope->GetQueue(stage->Type).GetFamilyIndex(), Scope->GetQueue(next->Type).GetFamilyIndex());
+		barrier = std::make_shared<GVkBarrier>(static_cast<const GStageViews::image_resource&>(resource).view, flags, access, m_Scope->GetQueue(stage->Type).GetFamilyIndex(), m_Scope->GetQueue(next->Type).GetFamilyIndex());
 	else
-		barrier = std::make_shared<GVkBarrier>(static_cast<const GStageViews::buffer_resource&>(resource).view, flags, access, Scope->GetQueue(stage->Type).GetFamilyIndex(), Scope->GetQueue(next->Type).GetFamilyIndex());
+		barrier = std::make_shared<GVkBarrier>(static_cast<const GStageViews::buffer_resource&>(resource).view, flags, access, m_Scope->GetQueue(stage->Type).GetFamilyIndex(), m_Scope->GetQueue(next->Type).GetFamilyIndex());
 
-	_ownershipsOut[stage].push_back(barrier);
-	_ownershipsIn[next].push_back(barrier);
+	m_ownershipsOut[stage].push_back(barrier);
+	m_ownershipsIn[next].push_back(barrier);
 }
 
 void GFrameGraph::_sync(std::vector<IRenderStage*>& list)
@@ -131,36 +135,37 @@ void GFrameGraph::_sync(std::vector<IRenderStage*>& list)
 	if (list.empty())
 		return;
 
-	std::unordered_map<IRenderStage*, std::unordered_set<IRenderStage*>> _adjacentLists;
+	std::unordered_map<IRenderStage*, adjacent_data> _adjacentLists;
 
 	for (auto& stage : list)
 	{
 		for (auto& other : list)
 		{
 			if (stage != other 
-				&& !_adjacentLists[other].contains(stage) 
-				&& !_adjacentLists[stage].contains(other))
+				&& !_adjacentLists[other].list.contains(stage) 
+				&& !_adjacentLists[stage].list.contains(other))
 			{
 				if (stage->_dependsOn(*other))
-					_adjacentLists[stage].insert(other);
+					_adjacentLists[stage].list.insert(other);
 			}
 		}
 	}
 
+	std::vector<IRenderStage*> ordered;
 	for (auto& stage : list)
-		_recursive_register(stage, _adjacentLists);
+		_recursive_register(stage, _adjacentLists, ordered);
 
-	_reorder_for_async(_adjacentLists);
+	_reorder_for_async(_adjacentLists, ordered);
 
-	for (size_t i = 0; i < _ordererd.size(); i++)
+	for (size_t i = 0; i < ordered.size(); i++)
 	{
-		IRenderStage* stage = _ordererd[i];
-		size_t j = (i + 1) % _ordererd.size();
+		IRenderStage* stage = ordered[i];
+		size_t j = (i + 1) % ordered.size();
 
 		std::unordered_set<IVkObj*> visited = {};
 		while (i != j)
 		{
-			IRenderStage* next = _ordererd[j];
+			IRenderStage* next = ordered[j];
 
 			for (auto& resource : stage->Resources)
 			{
@@ -177,21 +182,21 @@ void GFrameGraph::_sync(std::vector<IRenderStage*>& list)
 				}
 			}
 
-			j = (j + 1) % _ordererd.size();
+			j = (j + 1) % ordered.size();
 		}
 	}
 
 	std::vector<IRenderStage*> batches{};
 	VkQueueFlagBits lastQueue = VK_QUEUE_FLAG_BITS_MAX_ENUM;
-	std::shared_ptr<GVkFence> batchFence = std::make_shared<GVkFence>(Scope, EFenceFlags::CreateSignaled | EFenceFlags::InFlight);
+	std::shared_ptr<GVkFence> batchFence = std::make_shared<GVkFence>(m_Scope, EFenceFlags::CreateSignaled | EFenceFlags::InFlight);
 
-	for (auto& stage : _ordererd)
+	for (auto& stage : ordered)
 	{
 		if (lastQueue != stage->Type && !batches.empty())
 		{
-			_batches.emplace_back(lastQueue, batchFence, std::move(batches));
+			m_batches.emplace_back(lastQueue, batchFence, std::move(batches));
 
-			batchFence = std::make_shared<GVkFence>(Scope, EFenceFlags::CreateSignaled | EFenceFlags::InFlight);
+			batchFence = std::make_shared<GVkFence>(m_Scope, EFenceFlags::CreateSignaled | EFenceFlags::InFlight);
 			batches.clear();
 		}
 
@@ -201,7 +206,7 @@ void GFrameGraph::_sync(std::vector<IRenderStage*>& list)
 	}
 
 	if (!batches.empty())
-		_batches.emplace_back(lastQueue, batchFence, std::move(batches));
+		m_batches.emplace_back(lastQueue, batchFence, std::move(batches));
 }
 
 void GFrameGraph::_submit_batch(const recording_batch& batch)
@@ -214,7 +219,7 @@ void GFrameGraph::_submit_batch(const recording_batch& batch)
 	{
 		submitDescriptors[index].cmd = stage->CommandBuffer->GetCommandBuffer();
 
-		for (auto& semaphore : _semaphores[stage].waitSemaphores)
+		for (auto& semaphore : m_semaphores[stage].waitSemaphores)
 		{
 			if (auto sem = semaphore->GetWaitSemaphore())
 			{
@@ -223,7 +228,7 @@ void GFrameGraph::_submit_batch(const recording_batch& batch)
 			}
 		}
 
-		for (auto& semaphore : _semaphores[stage].signalSemaphores)
+		for (auto& semaphore : m_semaphores[stage].signalSemaphores)
 		{
 			if (auto sem = semaphore->GetSignalSemaphore())
 				submitDescriptors[index].signalSemaphores.push_back(sem);
@@ -244,50 +249,50 @@ void GFrameGraph::_submit_batch(const recording_batch& batch)
 	}
 
 	batch.fence->Reset();
-	Scope->GetQueue(batch.queueFlags).submit(submitInfos, batch.fence->GetFence());
+	m_Scope->GetQueue(batch.queueFlags).submit(submitInfos, batch.fence->GetFence());
 }
 
 void GFrameGraph::Draw(const GCamera& Camera, const IWorld& World)
 {
-	if (_revision != World.GetDrawableRevisionIndex())
+	if (m_revision != World.GetDrawableRevisionIndex())
 	{
-		for (auto& stage : _stages)
+		for (auto& stage : m_stages)
 			stage->Reset(World);
 
-		_revision = World.GetDrawableRevisionIndex();
-		_flags = 0;
+		m_revision = World.GetDrawableRevisionIndex();
+		m_flags = 0;
 	}
 
 	std::vector<IRenderStage*> _activeStages;
-	_activeStages.reserve(_stages.size());
+	_activeStages.reserve(m_stages.size());
 
 	size_t new_flags = 0;
-	for (size_t i = 0; i < _stages.size(); i++)
+	for (size_t i = 0; i < m_stages.size(); i++)
 	{
-		if (_stages[i]->IsActive(World))
+		if (m_stages[i]->IsActive(World))
 		{
-			_activeStages.emplace_back(_stages[i]);
+			_activeStages.emplace_back(m_stages[i].get());
 			new_flags |= 1ull << i;
 		}
 	}
 
-	if (new_flags != _flags)
+	if (new_flags != m_flags)
 	{
 		_clear();
-		_flags = new_flags;
+		m_flags = new_flags;
 
 		_sync(_activeStages);
 	}
 
-	for (auto& batch : _batches)
+	for (auto& batch : m_batches)
 	{
 		for (auto& stage : batch.stages)
 		{
-			stage->_bind_acquire_barriers(_ownershipsIn[stage]);
+			stage->_bind_acquire_barriers(m_ownershipsIn[stage]);
 
 			stage->record(Camera, World);
 
-			stage->_bind_release_barriers(_ownershipsOut[stage]);
+			stage->_bind_release_barriers(m_ownershipsOut[stage]);
 		}
 
 		_submit_batch(batch);

@@ -1,30 +1,27 @@
 #include "command_buffer.hpp"
 
-GVkCommandBuffer::GVkCommandBuffer(std::shared_ptr<RenderScope> InScope, VkQueueFlagBits Queue, ECmdFlags Flags)
-	: Scope(InScope), m_qFlags(Queue), m_cmdFlags(Flags)
+GVkCommandBuffer::GVkCommandBuffer(const std::shared_ptr<RenderScope>& InScope, VkQueueFlagBits Queue, ECmdFlags Flags)
+	: m_Scope(InScope), m_qFlags(Queue), m_cmdFlags(Flags)
 {
-	m_qFlags = Scope->ActualQueueType(m_qFlags);
+	m_qFlags = m_Scope->ActualQueueType(m_qFlags);
 
 	if (CheckFlag(Flags, ECmdFlags::InFlight))
-		m_flightResources.resize(Scope->GetMaxFramesInFlight());
+		m_flightResources.resize(m_Scope->GetMaxFramesInFlight());
 	else
 		m_flightResources.resize(1);
-
-	VkFenceCreateInfo fenceCreateInfo{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
-	fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
 	for (auto& object : m_flightResources)
 	{
 		if (CheckFlag(m_cmdFlags, ECmdFlags::Secondary))
-			Scope->GetQueue(m_qFlags).allocateCommandBuffer2(&object.cmd);
+			m_Scope->GetQueue(m_qFlags).allocateCommandBuffer2(&object.cmd);
 		else
-			Scope->GetQueue(m_qFlags).allocateCommandBuffer(&object.cmd);
+			m_Scope->GetQueue(m_qFlags).allocateCommandBuffer(&object.cmd);
 
-		object.fence = std::make_shared<GVkFence>(Scope, EFenceFlags::CreateSignaled);
+		object.fence = std::make_shared<GVkFence>(m_Scope, EFenceFlags::CreateSignaled);
 	}
 
-	vkCmdBeginConditionalRendering = (PFN_vkCmdBeginConditionalRenderingEXT)vkGetInstanceProcAddr(Scope->GetInstance(), "vkCmdBeginConditionalRenderingEXT");
-	vkCmdEndConditionalRendering = (PFN_vkCmdEndConditionalRenderingEXT)vkGetInstanceProcAddr(Scope->GetInstance(), "vkCmdEndConditionalRenderingEXT");
+	vkCmdBeginConditionalRendering = (PFN_vkCmdBeginConditionalRenderingEXT)vkGetInstanceProcAddr(m_Scope->GetInstance(), "vkCmdBeginConditionalRenderingEXT");
+	vkCmdEndConditionalRendering = (PFN_vkCmdEndConditionalRenderingEXT)vkGetInstanceProcAddr(m_Scope->GetInstance(), "vkCmdEndConditionalRenderingEXT");
 }
 
 GVkCommandBuffer::~GVkCommandBuffer()
@@ -40,7 +37,7 @@ GVkCommandBuffer::~GVkCommandBuffer()
 
 		object.fence->Wait(index);
 
-		Scope->GetQueue(m_qFlags).freeCommandBuffer(object.cmd);
+		m_Scope->GetQueue(m_qFlags).freeCommandBuffer(object.cmd);
 		index++;
 	}
 }
@@ -93,7 +90,7 @@ void GVkCommandBuffer::_submitRecording(_internalObj& object, const std::vector<
 
 	object.fence->Reset();
 	object.bRecorded = false;
-	Scope->GetQueue(m_qFlags).submitCommandBuffer(object.cmd, object.fence->GetFence(), waitSemaphores, waitStages, signalSemaphores);
+	m_Scope->GetQueue(m_qFlags).submitCommandBuffer(object.cmd, object.fence->GetFence(), waitSemaphores, waitStages, signalSemaphores);
 }
 
 void GVkCommandBuffer::_end(_internalObj& object)
@@ -122,10 +119,10 @@ void GVkCommandBuffer::_nextSubpass(VkSubpassContents Contents)
 	}
 }
 
-void GVkCommandBuffer::_acquire(std::shared_ptr<IVkObj> obj)
+void GVkCommandBuffer::_acquire(const std::shared_ptr<IVkObj>& obj)
 {
 	auto& object = _activeObj();
-	object.acquired_resources.emplace_back(std::move(obj));
+	object.acquired_resources.insert(obj);
 }
 
 VkCommandBuffer GVkCommandBuffer::GetCommandBuffer()
@@ -172,7 +169,13 @@ void GVkCommandBuffer::Submit(const std::vector<std::shared_ptr<GVkSemaphore>>& 
 	_end(object);
 
 	std::vector<VkPipelineStageFlags> waitStages;
-	std::vector<VkSemaphore> waitSemaphores, signalSemaphores;
+	waitStages.reserve(inWaitSemaphores.size());
+
+	std::vector<VkSemaphore> waitSemaphores;
+	waitSemaphores.reserve(inWaitSemaphores.size());
+
+	std::vector<VkSemaphore> signalSemaphores;
+	waitSemaphores.reserve(inSignalSemaphores.size());
 
 	for (auto& semaphore : inWaitSemaphores)
 	{
@@ -204,9 +207,9 @@ void GVkCommandBuffer::Reset()
 		_reset(object);
 }
 
-void GVkCommandBuffer::UpdateBuffer(std::shared_ptr<GVkBufferView> Buffer, char* Data)
+void GVkCommandBuffer::UpdateBuffer(const std::shared_ptr<GVkBufferView>& Buffer, const char* Data)
 {
-	if (char* Mapped = (char*)Buffer->GetRoot()->Map())
+	if (char* Mapped = static_cast<char*>(Buffer->GetRoot()->Map()))
 	{
 		memcpy(Mapped + Buffer->GetOffset(), Data, Buffer->GetSize());
 		Buffer->GetRoot()->UnMap();
@@ -219,7 +222,7 @@ void GVkCommandBuffer::UpdateBuffer(std::shared_ptr<GVkBufferView> Buffer, char*
 	}
 	else
 	{
-		auto stageBuffer = std::make_shared<GVkBuffer>(Scope, Buffer->GetSize(), EBufferFlags::Mapped | EBufferFlags::TransferSrc);
+		auto stageBuffer = std::make_shared<GVkBuffer>(m_Scope, Buffer->GetSize(), EBufferFlags::Mapped | EBufferFlags::TransferSrc);
 		auto stageBufferView = GVkBuffer::ToView(stageBuffer);
 
 		UpdateBuffer(stageBufferView, Data);
@@ -227,7 +230,7 @@ void GVkCommandBuffer::UpdateBuffer(std::shared_ptr<GVkBufferView> Buffer, char*
 	}
 }
 
-void GVkCommandBuffer::CopyBuffer(std::shared_ptr<GVkBufferView> BufferSrc, std::shared_ptr<GVkBufferView> BufferDst)
+void GVkCommandBuffer::CopyBuffer(const std::shared_ptr<GVkBufferView>& BufferSrc, const std::shared_ptr<GVkBufferView>& BufferDst)
 {
 	auto& object = _updateRecording();
 
@@ -244,7 +247,7 @@ void GVkCommandBuffer::CopyBuffer(std::shared_ptr<GVkBufferView> BufferSrc, std:
 	_acquire(BufferDst);
 }
 
-void GVkCommandBuffer::CopyBuffer(std::shared_ptr<GVkBufferView> BufferSrc, std::shared_ptr<GVkImageView> ImageDst)
+void GVkCommandBuffer::CopyBuffer(const std::shared_ptr<GVkBufferView>& BufferSrc, const std::shared_ptr<GVkImageView>& ImageDst)
 {
 	auto& object = _updateRecording();
 
@@ -266,7 +269,7 @@ void GVkCommandBuffer::CopyBuffer(std::shared_ptr<GVkBufferView> BufferSrc, std:
 	_acquire(ImageDst);
 }
 
-void GVkCommandBuffer::GenerateMipMaps(std::shared_ptr<GVkImage> Image)
+void GVkCommandBuffer::GenerateMipMaps(const std::shared_ptr<GVkImage>& Image)
 {
 	auto& object = _updateRecording();
 
@@ -286,7 +289,7 @@ void GVkCommandBuffer::GenerateMipMaps(std::shared_ptr<GVkImage> Image)
 	BindBarrier<GVkShaderReadBarrier>(view, VK_SHADER_STAGE_FRAGMENT_BIT);
 }
 
-void GVkCommandBuffer::ClearBuffer(std::shared_ptr<GVkBufferView> View, uint32_t Value)
+void GVkCommandBuffer::ClearBuffer(const std::shared_ptr<GVkBufferView>& View, uint32_t Value)
 {
 	auto& object = _updateRecording();
 
@@ -296,7 +299,7 @@ void GVkCommandBuffer::ClearBuffer(std::shared_ptr<GVkBufferView> View, uint32_t
 	_acquire(View);
 }
 
-void GVkCommandBuffer::ClearImage(std::shared_ptr<GVkImageView> Image, VkClearColorValue ClearValue)
+void GVkCommandBuffer::ClearImage(const std::shared_ptr<GVkImageView>& Image, VkClearColorValue ClearValue)
 {
 	auto& object = _updateRecording();
 
@@ -306,7 +309,7 @@ void GVkCommandBuffer::ClearImage(std::shared_ptr<GVkImageView> Image, VkClearCo
 	_acquire(Image);
 }
 
-void GVkCommandBuffer::ClearImage(std::shared_ptr<GVkImageView> View, VkClearDepthStencilValue ClearValue)
+void GVkCommandBuffer::ClearImage(const std::shared_ptr<GVkImageView>& View, VkClearDepthStencilValue ClearValue)
 {
 	auto& object = _updateRecording();
 
@@ -316,7 +319,7 @@ void GVkCommandBuffer::ClearImage(std::shared_ptr<GVkImageView> View, VkClearDep
 	_acquire(View);
 }
 
-void GVkCommandBuffer::BlitImage(std::shared_ptr<GVkImageView> Image, std::shared_ptr<GVkSwapchain> Swapchain)
+void GVkCommandBuffer::BlitImage(const std::shared_ptr<GVkImageView>& Image, const std::shared_ptr<GVkSwapchain>& Swapchain)
 {
 	auto& object = _updateRecording();
 
@@ -347,7 +350,7 @@ void GVkCommandBuffer::BlitImage(std::shared_ptr<GVkImageView> Image, std::share
 	_acquire(Image);
 }
 
-void GVkCommandBuffer::BlitImage(std::shared_ptr<GVkImageView> Source, std::shared_ptr<GVkImageView> Destination)
+void GVkCommandBuffer::BlitImage(const std::shared_ptr<GVkImageView>& Source, const std::shared_ptr<GVkImageView>& Destination)
 {
 	auto& object = _updateRecording();
 
@@ -386,7 +389,7 @@ std::shared_ptr<GVkFence> GVkCommandBuffer::GetFence() const
 	return object.fence;
 }
 
-void GVkCommandBuffer::BeginRenderPass(std::shared_ptr<GVkRenderPass> RenderPass, std::shared_ptr<GVkFramebuffer> Framebuffer, VkSubpassContents Contents)
+void GVkCommandBuffer::BeginRenderPass(const std::shared_ptr<GVkRenderPass>& RenderPass, const std::shared_ptr<GVkFramebuffer>& Framebuffer, VkSubpassContents Contents)
 {
 	if (RenderPass && Framebuffer)
 	{
@@ -495,7 +498,7 @@ void GVkCommandBuffer::EndRenderPass()
 	}
 }
 
-void GVkCommandBuffer::BindPipeline(std::shared_ptr<GVkPipeline> Pipeline)
+void GVkCommandBuffer::BindPipeline(const std::shared_ptr<GVkPipeline>& Pipeline)
 {
 	auto& object = _updateRecording();
 
@@ -516,7 +519,7 @@ void GVkCommandBuffer::BindPipeline(std::shared_ptr<GVkPipeline> Pipeline)
 	}
 }
 
-void GVkCommandBuffer::BindDescriptorSet(uint32_t Slot, std::shared_ptr<GVkDescriptorSet> Set)
+void GVkCommandBuffer::BindDescriptorSet(uint32_t Slot, const std::shared_ptr<GVkDescriptorSet>& Set)
 {
 	if (Set)
 	{
@@ -542,7 +545,7 @@ void GVkCommandBuffer::Draw(uint32_t VertexCount, uint32_t InstanceCount, uint32
 	vkCmdDraw(object.cmd, VertexCount, InstanceCount, BaseVertex, BaseInstance);
 }
 
-void GVkCommandBuffer::BindVertexBuffer(uint32_t Slot, std::shared_ptr<GVkBufferView> Buffer)
+void GVkCommandBuffer::BindVertexBuffer(uint32_t Slot, const std::shared_ptr<GVkBufferView>& Buffer)
 {
 	auto& object = _updateRecording();
 
@@ -552,7 +555,7 @@ void GVkCommandBuffer::BindVertexBuffer(uint32_t Slot, std::shared_ptr<GVkBuffer
 	_acquire(Buffer);
 }
 
-void GVkCommandBuffer::BindIndexBuffer(VkIndexType Type, std::shared_ptr<GVkBufferView> Buffer)
+void GVkCommandBuffer::BindIndexBuffer(VkIndexType Type, const std::shared_ptr<GVkBufferView>& Buffer)
 {
 	auto& object = _updateRecording();
 
@@ -570,7 +573,7 @@ void GVkCommandBuffer::DrawIndexed(uint32_t Count, uint32_t InstanceCount, uint3
 	vkCmdDrawIndexed(object.cmd, Count, InstanceCount, FirstIndex, BaseVertex, BaseInstance);
 }
 
-void GVkCommandBuffer::DrawIndirectCount(std::shared_ptr<GVkBuffer> IndirectBuffer, std::shared_ptr<GVkBuffer> CountBuffer, size_t CountOffset, uint32_t MaxCounts, uint32_t Stride)
+void GVkCommandBuffer::DrawIndirectCount(const std::shared_ptr<GVkBuffer>& IndirectBuffer, const std::shared_ptr<GVkBuffer>& CountBuffer, size_t CountOffset, uint32_t MaxCounts, uint32_t Stride)
 {
 	auto& object = _updateRecording();
 
@@ -579,7 +582,7 @@ void GVkCommandBuffer::DrawIndirectCount(std::shared_ptr<GVkBuffer> IndirectBuff
 	_acquire(CountBuffer);
 }
 
-void GVkCommandBuffer::DrawIndirectIndexedCount(std::shared_ptr<GVkBuffer> IndirectBuffer, std::shared_ptr<GVkBuffer> CountBuffer, size_t CountOffset, uint32_t MaxCounts, uint32_t Stride)
+void GVkCommandBuffer::DrawIndirectIndexedCount(const std::shared_ptr<GVkBuffer>& IndirectBuffer, const std::shared_ptr<GVkBuffer>& CountBuffer, size_t CountOffset, uint32_t MaxCounts, uint32_t Stride)
 {
 	auto& object = _updateRecording();
 
@@ -588,7 +591,7 @@ void GVkCommandBuffer::DrawIndirectIndexedCount(std::shared_ptr<GVkBuffer> Indir
 	_acquire(CountBuffer);
 }
 
-void GVkCommandBuffer::DrawIndirect(std::shared_ptr<GVkBufferView> IndirectBuffer)
+void GVkCommandBuffer::DrawIndirect(const std::shared_ptr<GVkBufferView>& IndirectBuffer)
 {
 	auto& object = _updateRecording();
 
@@ -596,7 +599,7 @@ void GVkCommandBuffer::DrawIndirect(std::shared_ptr<GVkBufferView> IndirectBuffe
 	_acquire(IndirectBuffer);
 }
 
-void GVkCommandBuffer::DrawIndirectIndexed(std::shared_ptr<GVkBufferView> IndirectBuffer)
+void GVkCommandBuffer::DrawIndirectIndexed(const std::shared_ptr<GVkBufferView>& IndirectBuffer)
 {
 	auto& object = _updateRecording();
 
@@ -604,7 +607,7 @@ void GVkCommandBuffer::DrawIndirectIndexed(std::shared_ptr<GVkBufferView> Indire
 	_acquire(IndirectBuffer);
 }
 
-void GVkCommandBuffer::BeginConditionalRendering(std::shared_ptr<GVkBufferView> Buffer)
+void GVkCommandBuffer::BeginConditionalRendering(const std::shared_ptr<GVkBufferView>& Buffer)
 {
 	if (vkCmdBeginConditionalRendering)
 	{
@@ -630,7 +633,7 @@ void GVkCommandBuffer::EndConditionalRendering()
 	}
 }
 
-void GVkCommandBuffer::Execute(std::shared_ptr<GVkCommandBuffer> Commands)
+void GVkCommandBuffer::Execute(const std::shared_ptr<GVkCommandBuffer>& Commands)
 {
 	auto& object = _updateRecording();
 
@@ -656,7 +659,7 @@ void GVkCommandBuffer::BindBarriers(const std::vector<VkBufferMemoryBarrier2>& b
 	vkCmdPipelineBarrier2(object.cmd, &dependencyInfo);
 }
 
-void GVkCommandBuffer::SetFence(std::shared_ptr<GVkFence> fence)
+void GVkCommandBuffer::SetFence(const std::shared_ptr<GVkFence>& fence)
 {
 	for (auto& object : m_flightResources)
 		object.fence = fence;

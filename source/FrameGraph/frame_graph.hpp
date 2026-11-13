@@ -5,6 +5,13 @@
 
 class GFrameGraph
 {
+	enum class e_dfs_state
+	{
+		unvisited,
+		active,
+		done
+	};
+
 	struct submit_descriptor
 	{
 		VkCommandBuffer cmd = VK_NULL_HANDLE;
@@ -25,28 +32,34 @@ class GFrameGraph
 		std::vector<IRenderStage*> stages;
 	};
 
-private:
-	std::unordered_map<IRenderStage*, std::vector<std::shared_ptr<GVkBarrier>>> _ownershipsOut;
-	std::unordered_map<IRenderStage*, std::vector<std::shared_ptr<GVkBarrier>>> _ownershipsIn;
-	std::unordered_map<IRenderStage*, semaphore_pair> _semaphores;
-	std::vector<IRenderStage*> _ordererd;
-	std::vector<recording_batch> _batches;
+	struct adjacent_data
+	{
+		e_dfs_state owner_state = e_dfs_state::unvisited;
+		std::unordered_set<IRenderStage*> list;
+	};
 
 private:
-	std::vector<IRenderStage*> _stages;
-	size_t _revision = ~0;
-	size_t _flags = 0;
+	std::unordered_map<IRenderStage*, std::vector<std::shared_ptr<GVkBarrier>>> m_ownershipsOut;
+	std::unordered_map<IRenderStage*, std::vector<std::shared_ptr<GVkBarrier>>> m_ownershipsIn;
+	std::unordered_map<IRenderStage*, semaphore_pair> m_semaphores;
+	std::vector<recording_batch> m_batches;
+
+private:
+	std::vector<std::unique_ptr<IRenderStage>> m_stages;
+	size_t m_revision = ~0;
+	size_t m_flags = 0;
 
 protected:
-	std::shared_ptr<RenderScope> Scope = VK_NULL_HANDLE;
+	std::shared_ptr<RenderScope> m_Scope = VK_NULL_HANDLE;
 
 private:
 	void _clear();
 	void _sync(std::vector<IRenderStage*>& list);
 	void _bind_barriers(IRenderStage* stage, IRenderStage* next, const GStageViews::stage_resource& resource);
 	void _bind_semaphores(IRenderStage* stage, IRenderStage* next, const GStageViews::stage_resource& resource);
-	void _reorder_for_async(std::unordered_map<IRenderStage*, std::unordered_set<IRenderStage*>>& adjacent_list);
-	void _recursive_register(IRenderStage* stage, std::unordered_map<IRenderStage*, std::unordered_set<IRenderStage*>>& adjacent_list);
+
+	void _reorder_for_async(const std::unordered_map<IRenderStage*, adjacent_data>& adjacent_list, std::vector<IRenderStage*>& target_list);
+	void _recursive_register(IRenderStage* stage, std::unordered_map<IRenderStage*, adjacent_data>& adjacent_list, std::vector<IRenderStage*>& target_list);
 
 	void _submit_batch(const recording_batch& batch);
 
@@ -60,6 +73,6 @@ public:
 	template<typename T, typename ...Args>
 	void AddStage(Args&& ...args)
 	{
-		_stages.push_back(new T(args...));
+		m_stages.push_back(std::make_unique<T>(args...));
 	}
 };

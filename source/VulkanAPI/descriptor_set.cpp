@@ -19,14 +19,14 @@ static uint32_t _clampToCapability(std::shared_ptr<RenderScope> Scope, VkDescrip
 }
 
 GVkDescriptorSet::GVkDescriptorSet(std::shared_ptr<RenderScope> InScope)
-	: Scope(InScope)
+	: m_Scope(InScope)
 {
 
 }
 
 GVkDescriptorSet::~GVkDescriptorSet()
 {
-	vkDestroyDescriptorPool(Scope->GetDevice(), m_descriptorSetPool, VK_NULL_HANDLE);
+	vkDestroyDescriptorPool(m_Scope->GetDevice(), m_descriptorSetPool, VK_NULL_HANDLE);
 }
 
 const VkDescriptorSet& GVkDescriptorSet::GetDescriptorSet() const
@@ -278,14 +278,14 @@ std::shared_ptr<GVkDescriptorSet> DescriptorSetDescriptor::Allocate(std::shared_
 }
 
 GVkDescriptorSetLayout::GVkDescriptorSetLayout(std::shared_ptr<RenderScope> InScope, const VkDescriptorSetLayoutCreateInfo& info)
-	: Scope(InScope)
+	: m_Scope(InScope)
 {
-	vkCreateDescriptorSetLayout(Scope->GetDevice(), &info, VK_NULL_HANDLE, &m_descriptorSetLayout);
+	vkCreateDescriptorSetLayout(m_Scope->GetDevice(), &info, VK_NULL_HANDLE, &m_descriptorSetLayout);
 }
 
 GVkDescriptorSetLayout::~GVkDescriptorSetLayout()
 {
-	vkDestroyDescriptorSetLayout(Scope->GetDevice(), m_descriptorSetLayout, VK_NULL_HANDLE);
+	vkDestroyDescriptorSetLayout(m_Scope->GetDevice(), m_descriptorSetLayout, VK_NULL_HANDLE);
 }
 
 DescriptorLayoutDescriptor& DescriptorLayoutDescriptor::AddUniformBuffer(VkShaderStageFlags stages, bool bVariableSize)
