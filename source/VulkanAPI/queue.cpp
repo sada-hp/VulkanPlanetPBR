@@ -1,6 +1,6 @@
 #include "queue.hpp"
 
-Queue::Queue(const VkDevice& inDevice, uint32_t inFamily)
+Queue::Queue(const VkDevice& inDevice, VkQueueFlags flags, uint32_t inFamily)
 	: m_vkDevice(inDevice), m_familyIndex(inFamily)
 {
 	vkGetDeviceQueue(m_vkDevice, m_familyIndex, 0, &m_vkQueue);
@@ -10,11 +10,25 @@ Queue::Queue(const VkDevice& inDevice, uint32_t inFamily)
 	poolInfo.queueFamilyIndex = m_familyIndex;
 
 	vkCreateCommandPool(m_vkDevice, &poolInfo, VK_NULL_HANDLE, &m_CmdPool);
+
+	if (flags & VK_QUEUE_COMPUTE_BIT)
+		m_supportedFlags |= VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
+
+	if (flags & VK_QUEUE_TRANSFER_BIT)
+		m_supportedFlags |= VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT | VK_PIPELINE_STAGE_2_TRANSFER_BIT | VK_PIPELINE_STAGE_2_COPY_BIT | VK_PIPELINE_STAGE_2_RESOLVE_BIT | VK_PIPELINE_STAGE_2_BLIT_BIT | VK_PIPELINE_STAGE_2_CLEAR_BIT;
+
+	if (flags & VK_QUEUE_GRAPHICS_BIT)
+		m_supportedFlags = ~0ull;
 }
 
 Queue::~Queue()
 {
 	vkDestroyCommandPool(m_vkDevice, m_CmdPool, VK_NULL_HANDLE);
+}
+
+bool Queue::IsStageSupported(VkPipelineStageFlags2 Stage) const
+{
+	return (m_supportedFlags & Stage) != 0;
 }
 
 void Queue::allocateCommandBuffer(VkCommandBuffer* cmd) const

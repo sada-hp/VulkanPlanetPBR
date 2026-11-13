@@ -233,6 +233,7 @@ void RenderScope::_createMemoryAllocator()
 void RenderScope::_collectQueues()
 {
 	uint32_t gQ = ~0, cQ = ~0, tQ = ~0;
+	VkQueueFlags gQF = 0, cQF = 0, tQF = 0;
 
 	uint32_t qFamiliesCount;
 	std::vector<VkQueueFamilyProperties> qFamilies;
@@ -247,16 +248,19 @@ void RenderScope::_collectQueues()
 		if (CheckFlag(qProp.queueFlags, VK_QUEUE_GRAPHICS_BIT) && gQ == ~0)
 		{
 			gQ = qFamilyIndex;
+			gQF = qProp.queueFlags;
 		}
 		else
 		{
 			if (CheckFlag(qProp.queueFlags, VK_QUEUE_COMPUTE_BIT) && cQ == ~0)
 			{
 				cQ = qFamilyIndex;
+				cQF = qProp.queueFlags;
 			}
 			else if (CheckFlag(qProp.queueFlags, VK_QUEUE_TRANSFER_BIT) && tQ == ~0)
 			{
 				tQ = qFamilyIndex;
+				tQF = qProp.queueFlags;
 			}
 		}
 
@@ -265,13 +269,13 @@ void RenderScope::_collectQueues()
 
 	assert(gQ != ~0);
 
-	m_Queues.emplace(std::piecewise_construct, std::forward_as_tuple(VK_QUEUE_GRAPHICS_BIT), std::forward_as_tuple(m_LogicalDevice, gQ));
+	m_Queues.emplace(std::piecewise_construct, std::forward_as_tuple(VK_QUEUE_GRAPHICS_BIT), std::forward_as_tuple(m_LogicalDevice, gQF, gQ));
 
 	if (cQ != ~0)
-		m_Queues.emplace(std::piecewise_construct, std::forward_as_tuple(VK_QUEUE_COMPUTE_BIT), std::forward_as_tuple(m_LogicalDevice, cQ));
+		m_Queues.emplace(std::piecewise_construct, std::forward_as_tuple(VK_QUEUE_COMPUTE_BIT), std::forward_as_tuple(m_LogicalDevice, cQF, cQ));
 
 	if (tQ != ~0)
-		m_Queues.emplace(std::piecewise_construct, std::forward_as_tuple(VK_QUEUE_TRANSFER_BIT), std::forward_as_tuple(m_LogicalDevice, tQ));
+		m_Queues.emplace(std::piecewise_construct, std::forward_as_tuple(VK_QUEUE_TRANSFER_BIT), std::forward_as_tuple(m_LogicalDevice, tQF, tQ));
 }
 
 RenderScope::RenderScope()

@@ -8,13 +8,16 @@ private:
 	VkQueue m_vkQueue = VK_NULL_HANDLE;
 	VkDevice m_vkDevice = VK_NULL_HANDLE;
 	VkCommandPool m_CmdPool = VK_NULL_HANDLE;
+	VkPipelineStageFlags2 m_supportedFlags = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT | VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT | VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT | VK_PIPELINE_STAGE_2_HOST_BIT;
 
 public:
-	Queue(const VkDevice& device, uint32_t family);
+	Queue(const VkDevice& device, VkQueueFlags flags, uint32_t family);
 	~Queue();
 
 	const uint32_t& GetFamilyIndex() const { return m_familyIndex; };
 	const VkQueue& GetQueue() const { return m_vkQueue; };
+
+	bool IsStageSupported(VkPipelineStageFlags2 Stage) const;
 
 	void allocateCommandBuffer2(VkCommandBuffer* cmd) const;
 	void allocateCommandBuffer(VkCommandBuffer* cmd) const;

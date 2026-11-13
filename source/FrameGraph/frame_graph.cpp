@@ -1,30 +1,5 @@
 #include "frame_graph.hpp"
 
-static bool _stageSupported(VkQueueFlags queue, VkPipelineStageFlags2 stage)
-{
-	stage &= ~VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
-	stage &= ~VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-	stage &= ~VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
-
-	if (queue == VK_QUEUE_TRANSFER_BIT)
-	{
-		stage &= ~VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-		stage &= ~VK_PIPELINE_STAGE_2_RESOLVE_BIT;
-		stage &= ~VK_PIPELINE_STAGE_2_COPY_BIT;
-		stage &= ~VK_PIPELINE_STAGE_2_BLIT_BIT;
-	}
-	else if (queue == VK_QUEUE_COMPUTE_BIT)
-	{
-		stage &= ~VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-	}
-	else
-	{
-		stage = 0;
-	}
-
-	return stage == 0;
-}
-
 GFrameGraph::GFrameGraph(std::shared_ptr<RenderScope> InScope)
 	: m_Scope(InScope)
 {
@@ -98,10 +73,7 @@ void GFrameGraph::_bind_semaphores(IRenderStage* stage, IRenderStage* next, cons
 {
 	VkPipelineStageFlags2 flags = resource.stage;
 
-	if (!_stageSupported(next->Type, flags))
-		flags = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
-
-	if (resource.Op == EResourceOp::WriteOnly)
+	if (!m_Scope->GetQueue(next->Type).IsStageSupported(flags))
 		flags = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
 
 	std::shared_ptr<GVkSemaphore> semaphore = std::make_shared<GVkSemaphore>(m_Scope, flags, ESemaphoreFlags::InFlight);
@@ -114,10 +86,10 @@ void GFrameGraph::_bind_barriers(IRenderStage* stage, IRenderStage* next, const 
 	VkPipelineStageFlags2 flags = resource.stage;
 	VkAccessFlagBits2 access = resource.access;
 
-	if (!_stageSupported(next->Type, flags))
+	if (!m_Scope->GetQueue(next->Type).IsStageSupported(flags))
 	{
 		access = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT;
-		flags = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
+		flags = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
 	}
 
 	std::shared_ptr<GVkBarrier> barrier;
